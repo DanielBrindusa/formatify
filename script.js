@@ -203,7 +203,7 @@ function renderPreview(state) {
   }
 
   if (state.kind === 'image') {
-    previewBox.appendChild(state.image.cloneNode());
+    previewBox.appendChild(state.image);
     return;
   }
 
@@ -234,17 +234,15 @@ function renderPreviewMessage(message) {
 
 async function fileToImage(file) {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Unsupported or corrupt image file.'));
+      img.src = reader.result;
     };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Unsupported or corrupt image file.'));
-    };
-    img.src = url;
+    reader.onerror = () => reject(new Error('The image file could not be read.'));
+    reader.readAsDataURL(file);
   });
 }
 
