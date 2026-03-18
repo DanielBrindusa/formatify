@@ -3,43 +3,63 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Image ⇄ ICO Converter</title>
+  <title>Universal File Converter</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app">
-    <header>
-      <h1>Image ⇄ ICO Converter</h1>
-      <p>Convert PNG, JPG, JPEG, and ICO directly in your browser.</p>
+    <header class="hero">
+      <div>
+        <h1>Universal File Converter</h1>
+        <p>
+          Convert images, ICO, PDF, DOCX, and XLSX directly in your browser.
+          Built for GitHub Pages.
+        </p>
+      </div>
+      <div class="hero-badge">Client-side only</div>
     </header>
 
     <section class="card">
       <div class="grid">
         <div class="field full">
-          <label for="fileInput">Choose image</label>
-          <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.ico,image/png,image/jpeg,image/x-icon,image/vnd.microsoft.icon" />
-          <small>Supported input: PNG, JPG, JPEG, ICO</small>
+          <label for="fileInput">Choose file</label>
+          <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.ico,.pdf,.docx,.xlsx,image/png,image/jpeg,image/x-icon,image/vnd.microsoft.icon,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+          <small>
+            Supported input: PNG, JPG, JPEG, ICO, PDF, DOCX, XLSX
+          </small>
+        </div>
+
+        <div class="field">
+          <label for="inputType">Detected input type</label>
+          <input id="inputType" type="text" value="No file selected" readonly />
         </div>
 
         <div class="field">
           <label for="outputFormat">Output format</label>
-          <select id="outputFormat">
-            <option value="png">PNG</option>
-            <option value="jpg">JPG</option>
-            <option value="jpeg">JPEG</option>
-            <option value="ico" selected>ICO</option>
+          <select id="outputFormat"></select>
+        </div>
+
+        <div class="field">
+          <label for="iconSize">Canvas / icon size</label>
+          <select id="iconSize">
+            <option value="16">16 × 16</option>
+            <option value="32">32 × 32</option>
+            <option value="48">48 × 48</option>
+            <option value="64">64 × 64</option>
+            <option value="128">128 × 128</option>
+            <option value="256" selected>256 × 256</option>
+            <option value="512">512 × 512</option>
+            <option value="1024">1024 × 1024</option>
           </select>
         </div>
 
         <div class="field">
-          <label for="iconSize">Output size</label>
-          <select id="iconSize">
-            <option value="16">16 × 16</option>
-            <option value="32" selected>32 × 32</option>
-            <option value="48">48 × 48</option>
-            <option value="64">64 × 64</option>
-            <option value="128">128 × 128</option>
-            <option value="256">256 × 256</option>
+          <label for="pdfScale">PDF render scale</label>
+          <select id="pdfScale">
+            <option value="1">1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2" selected>2×</option>
+            <option value="3">3×</option>
           </select>
         </div>
 
@@ -49,8 +69,12 @@
             Preserve transparency when possible
           </label>
           <label class="checkbox">
-            <input id="downloadAll" type="checkbox" />
-            Also create PNG, JPG, JPEG, and ICO in one click
+            <input id="mergePdfImages" type="checkbox" checked />
+            Zip multi-page PDF image exports automatically
+          </label>
+          <label class="checkbox">
+            <input id="downloadAllImages" type="checkbox" />
+            For image inputs also create PNG, JPG, JPEG, ICO, and PDF
           </label>
         </div>
       </div>
@@ -65,7 +89,7 @@
       <div class="preview-wrapper">
         <div>
           <h2>Preview</h2>
-          <div id="previewBox" class="preview-box empty">No image loaded</div>
+          <div id="previewBox" class="preview-box empty">No file loaded</div>
         </div>
         <div>
           <h2>Result</h2>
@@ -77,15 +101,43 @@
     </section>
 
     <section class="card notes">
-      <h2>Notes</h2>
-      <ul>
-        <li>Everything runs locally in your browser.</li>
-        <li>JPG/JPEG do not support transparency. Transparent pixels are filled with white.</li>
-        <li>ICO export is generated as a valid single-image icon file.</li>
-      </ul>
+      <h2>Supported conversions</h2>
+      <div class="support-grid">
+        <div>
+          <strong>Images / ICO</strong>
+          <ul>
+            <li>PNG ⇄ JPG / JPEG / ICO / PDF</li>
+            <li>JPG / JPEG ⇄ PNG / ICO / PDF</li>
+            <li>ICO → PNG / JPG / JPEG / ICO / PDF</li>
+          </ul>
+        </div>
+        <div>
+          <strong>PDF</strong>
+          <ul>
+            <li>PDF → PNG / JPG / JPEG / TXT</li>
+            <li>PNG / JPG / JPEG / ICO → PDF</li>
+          </ul>
+        </div>
+        <div>
+          <strong>Office files</strong>
+          <ul>
+            <li>DOCX → PDF / TXT</li>
+            <li>XLSX → PDF / CSV / TXT</li>
+          </ul>
+        </div>
+      </div>
+      <p class="muted note-text">
+        DOCX and XLSX to PDF are generated in-browser, so complex layouts, advanced formulas, charts,
+        comments, tracked changes, or embedded objects may be simplified.
+      </p>
     </section>
   </div>
 
-  <script src="script.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="script.js" type="module"></script>
 </body>
 </html>
