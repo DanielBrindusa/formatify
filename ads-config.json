@@ -1,20 +1,19 @@
 {
-  "adminPassword": "formatify-admin",
   "slots": {
     "top": [
       {
         "enabled": true,
         "label": "Featured",
         "title": "Promote your premium converter offer",
-        "text": "Use this space for your own product, service, affiliate, announcement, or sponsor message.",
+        "text": "Use this top space for your own product, service, affiliate offer, launch, or sponsor message.",
         "buttonText": "Learn more",
         "url": "#"
       },
       {
-        "enabled": true,
-        "label": "Tools",
-        "title": "Share another useful tool from your brand",
-        "text": "Perfect for cross-promotion, featured updates, partner links, or limited-time offers.",
+        "enabled": false,
+        "label": "Tool",
+        "title": "Cross-promote another useful tool",
+        "text": "Ideal for a second ad card if you want more visibility without changing the main app layout.",
         "buttonText": "Open",
         "url": "#"
       }
@@ -23,7 +22,7 @@
       "enabled": true,
       "label": "Spotlight",
       "title": "Highlight a trusted recommendation",
-      "text": "This smaller card works well for one compact internal ad or announcement.",
+      "text": "This compact sidebar card works well for one internal ad, partner message, or announcement.",
       "buttonText": "See details",
       "url": "#"
     },
@@ -31,8 +30,8 @@
       {
         "enabled": true,
         "label": "New",
-        "title": "Announce a new feature or product",
-        "text": "Keep your audience aware of launches without touching the main app layout.",
+        "title": "Announce a new feature or offer",
+        "text": "Use the bottom area for updates, launches, affiliate links, or extra promotions.",
         "buttonText": "Check it out",
         "url": "#"
       }
