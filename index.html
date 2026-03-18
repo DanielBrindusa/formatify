@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image ⇄ ICO Converter</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Image ⇄ ICO Converter</h1>
+      <p>Convert PNG, JPG, JPEG, and ICO directly in your browser.</p>
+    </header>
+
+    <section class="card">
+      <div class="grid">
+        <div class="field full">
+          <label for="fileInput">Choose image</label>
+          <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.ico,image/png,image/jpeg,image/x-icon,image/vnd.microsoft.icon" />
+          <small>Supported input: PNG, JPG, JPEG, ICO</small>
+        </div>
+
+        <div class="field">
+          <label for="outputFormat">Output format</label>
+          <select id="outputFormat">
+            <option value="png">PNG</option>
+            <option value="jpg">JPG</option>
+            <option value="jpeg">JPEG</option>
+            <option value="ico" selected>ICO</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="iconSize">Output size</label>
+          <select id="iconSize">
+            <option value="16">16 × 16</option>
+            <option value="32" selected>32 × 32</option>
+            <option value="48">48 × 48</option>
+            <option value="64">64 × 64</option>
+            <option value="128">128 × 128</option>
+            <option value="256">256 × 256</option>
+          </select>
+        </div>
+
+        <div class="field full inline-row">
+          <label class="checkbox">
+            <input id="preserveTransparency" type="checkbox" checked />
+            Preserve transparency when possible
+          </label>
+          <label class="checkbox">
+            <input id="downloadAll" type="checkbox" />
+            Also create PNG, JPG, JPEG, and ICO in one click
+          </label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="convertBtn">Convert</button>
+        <button id="resetBtn" class="secondary" type="button">Reset</button>
+      </div>
+    </section>
+
+    <section class="card preview-card">
+      <div class="preview-wrapper">
+        <div>
+          <h2>Preview</h2>
+          <div id="previewBox" class="preview-box empty">No image loaded</div>
+        </div>
+        <div>
+          <h2>Result</h2>
+          <div id="resultBox" class="result-box">
+            <p class="muted">Converted files will appear here.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card notes">
+      <h2>Notes</h2>
+      <ul>
+        <li>Everything runs locally in your browser.</li>
+        <li>JPG/JPEG do not support transparency. Transparent pixels are filled with white.</li>
+        <li>ICO export is generated as a valid single-image icon file.</li>
+      </ul>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
