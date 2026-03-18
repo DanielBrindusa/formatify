@@ -204,7 +204,7 @@ function renderPreview(state) {
   }
 
   if (state.kind === 'image') {
-    previewBox.appendChild(state.image.cloneNode());
+    previewBox.appendChild(state.image);
     return;
   }
 
