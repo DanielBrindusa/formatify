@@ -595,6 +595,8 @@ function makeTextResult(filename, text, mime = 'text/plain;charset=utf-8') {
 }
 
 function setStatus(message, isError = false) {
+  resultBox.innerHTML = `<div class="status ${isError ? 'error' : ''}">${escapeHtml(message)}</div>`;
+
   if (!statusBadge) return;
   statusBadge.textContent = message;
   statusBadge.className = 'status-badge';
@@ -604,11 +606,11 @@ function setStatus(message, isError = false) {
     return;
   }
 
-  if (/converting|loading/i.test(message)) {
+  if (/converting/i.test(message) || /loading/i.test(message)) {
     statusBadge.classList.add('busy');
   } else if (/ready/i.test(message)) {
     statusBadge.classList.add('ready');
-  } else if (/complete|done|success/i.test(message)) {
+  } else if (/complete|done/i.test(message)) {
     statusBadge.classList.add('success');
   } else {
     statusBadge.classList.add('idle');
@@ -642,6 +644,4 @@ function resetAll() {
   syncVisibleControls('png');
   renderPreviewMessage('No file loaded');
   resultBox.innerHTML = '<p class="muted">Converted files will appear here.</p>';
-  convertBtn.disabled = false;
-  setStatus('Ready to convert.');
 }
