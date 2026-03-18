@@ -3,135 +3,208 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Universal File Converter</title>
+  <title>Formatify — Universal File Converter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app">
-    <header class="hero">
-      <div>
-        <h1>Universal File Converter</h1>
-        <p>
-          Convert images, ICO, PDF, DOCX, and XLSX directly in your browser.
-          Built for GitHub Pages.
-        </p>
-      </div>
-      <div class="hero-badge">Client-side only</div>
-    </header>
+  <div class="app-shell">
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
 
-    <section class="card">
-      <div class="grid">
-        <div class="field full">
-          <label for="fileInput">Choose file</label>
-          <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.ico,.pdf,.docx,.xlsx,image/png,image/jpeg,image/x-icon,image/vnd.microsoft.icon,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
-          <small>
-            Supported input: PNG, JPG, JPEG, ICO, PDF, DOCX, XLSX
-          </small>
+    <main class="app">
+      <section class="hero-card">
+        <div class="hero-copy">
+          <div class="brand-row">
+            <div class="brand-mark">F</div>
+            <div>
+              <div class="eyebrow">Formatify</div>
+              <h1>Convert files with a cleaner, friendlier workflow.</h1>
+            </div>
+          </div>
+
+          <p class="hero-text">
+            A polished browser-based converter for images, PDFs, DOCX, XLSX, and ICO files.
+            Fast, simple, and ready for GitHub Pages.
+          </p>
+
+          <div class="hero-pills">
+            <span>Client-side</span>
+            <span>No uploads to server</span>
+            <span>Image, PDF, Office</span>
+          </div>
         </div>
 
-        <div class="field">
-          <label for="inputType">Detected input type</label>
-          <input id="inputType" type="text" value="No file selected" readonly />
+        <div class="hero-art" aria-hidden="true">
+          <img src="formatify.png" alt="" />
+          <div class="hero-glass-card top-card">
+            <strong>Smart conversion</strong>
+            <span>Clean options based on file type</span>
+          </div>
+          <div class="hero-glass-card bottom-card">
+            <strong>Original size support</strong>
+            <span>Keep image dimensions when needed</span>
+          </div>
         </div>
+      </section>
 
-        <div class="field">
-          <label for="outputFormat">Output format</label>
-          <select id="outputFormat"></select>
-        </div>
+      <section class="workspace-grid">
+        <section class="card control-card">
+          <div class="section-heading">
+            <div>
+              <div class="section-kicker">Step 1</div>
+              <h2>Set up your conversion</h2>
+            </div>
+            <div id="statusBadge" class="status-badge idle">Waiting for file</div>
+          </div>
 
-        <div class="field">
-          <label for="iconSize">Canvas / icon size</label>
-          <select id="iconSize">
-            <option value="original" selected>Original size</option>
-            <option value="16">16 × 16</option>
-            <option value="32">32 × 32</option>
-            <option value="48">48 × 48</option>
-            <option value="64">64 × 64</option>
-            <option value="128">128 × 128</option>
-            <option value="256">256 × 256</option>
-            <option value="512">512 × 512</option>
-            <option value="1024">1024 × 1024</option>
-          </select>
-        </div>
+          <div class="upload-panel">
+            <label for="fileInput" class="upload-box">
+              <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.ico,.pdf,.docx,.xlsx,image/png,image/jpeg,image/x-icon,image/vnd.microsoft.icon,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+              <span class="upload-icon">⇪</span>
+              <span class="upload-title">Choose a file</span>
+              <span class="upload-subtitle">PNG, JPG, JPEG, ICO, PDF, DOCX, XLSX</span>
+            </label>
+          </div>
 
-        <div class="field">
-          <label for="pdfScale">PDF render scale</label>
-          <select id="pdfScale">
-            <option value="1">1×</option>
-            <option value="1.5">1.5×</option>
-            <option value="2" selected>2×</option>
-            <option value="3">3×</option>
-          </select>
-        </div>
+          <div class="quick-info-row">
+            <div class="mini-info-card">
+              <span class="mini-label">Detected type</span>
+              <input id="inputType" type="text" value="No file selected" readonly />
+            </div>
+            <div class="mini-info-card">
+              <span class="mini-label">Output format</span>
+              <select id="outputFormat"></select>
+            </div>
+          </div>
 
-        <div class="field full inline-row">
-          <label class="checkbox">
-            <input id="preserveTransparency" type="checkbox" checked />
-            Preserve transparency when possible
-          </label>
-          <label class="checkbox">
-            <input id="mergePdfImages" type="checkbox" checked />
-            Zip multi-page PDF image exports automatically
-          </label>
-          <label class="checkbox">
-            <input id="downloadAllImages" type="checkbox" />
-            For image inputs also create PNG, JPG, JPEG, ICO, and PDF
-          </label>
-        </div>
-      </div>
+          <div class="grid">
+            <div class="field" id="imageSizeField">
+              <label for="iconSize">Output size</label>
+              <select id="iconSize">
+                <option value="original" selected>Original size</option>
+                <option value="16">16 × 16</option>
+                <option value="32">32 × 32</option>
+                <option value="48">48 × 48</option>
+                <option value="64">64 × 64</option>
+                <option value="128">128 × 128</option>
+                <option value="256">256 × 256</option>
+                <option value="512">512 × 512</option>
+                <option value="1024">1024 × 1024</option>
+              </select>
+              <small>Used for image exports. “Original size” keeps the real dimensions.</small>
+            </div>
 
-      <div class="actions">
-        <button id="convertBtn">Convert</button>
-        <button id="resetBtn" class="secondary" type="button">Reset</button>
-      </div>
-    </section>
+            <div class="field" id="pdfScaleField">
+              <label for="pdfScale">PDF render quality</label>
+              <select id="pdfScale">
+                <option value="1">1×</option>
+                <option value="1.5">1.5×</option>
+                <option value="2" selected>2×</option>
+                <option value="3">3×</option>
+              </select>
+              <small>Higher scale gives sharper page exports.</small>
+            </div>
+          </div>
 
-    <section class="card preview-card">
-      <div class="preview-wrapper">
-        <div>
-          <h2>Preview</h2>
+          <div class="toggle-grid">
+            <label class="checkbox pill-toggle" id="transparencyField">
+              <input id="preserveTransparency" type="checkbox" checked />
+              <span>
+                <strong>Preserve transparency</strong>
+                <small>Keep alpha background when supported</small>
+              </span>
+            </label>
+
+            <label class="checkbox pill-toggle" id="mergePdfImagesField">
+              <input id="mergePdfImages" type="checkbox" checked />
+              <span>
+                <strong>Zip PDF page images</strong>
+                <small>Bundle multi-page exports automatically</small>
+              </span>
+            </label>
+
+            <label class="checkbox pill-toggle full-span" id="downloadAllImagesField">
+              <input id="downloadAllImages" type="checkbox" />
+              <span>
+                <strong>Create all image outputs</strong>
+                <small>For image files, also create PNG, JPG, JPEG, ICO, and PDF in one run</small>
+              </span>
+            </label>
+          </div>
+
+          <div class="actions">
+            <button id="convertBtn">Convert file</button>
+            <button id="resetBtn" class="secondary" type="button">Reset</button>
+          </div>
+        </section>
+
+        <section class="card side-card">
+          <div class="section-heading compact">
+            <div>
+              <div class="section-kicker">Step 2</div>
+              <h2>Preview</h2>
+            </div>
+          </div>
           <div id="previewBox" class="preview-box empty">No file loaded</div>
-        </div>
-        <div>
-          <h2>Result</h2>
+        </section>
+      </section>
+
+      <section class="results-grid">
+        <section class="card result-card">
+          <div class="section-heading compact">
+            <div>
+              <div class="section-kicker">Step 3</div>
+              <h2>Results</h2>
+            </div>
+          </div>
           <div id="resultBox" class="result-box">
             <p class="muted">Converted files will appear here.</p>
           </div>
-        </div>
-      </div>
-    </section>
+        </section>
 
-    <section class="card notes">
-      <h2>Supported conversions</h2>
-      <div class="support-grid">
-        <div>
-          <strong>Images / ICO</strong>
-          <ul>
-            <li>PNG ⇄ JPG / JPEG / ICO / PDF</li>
-            <li>JPG / JPEG ⇄ PNG / ICO / PDF</li>
-            <li>ICO → PNG / JPG / JPEG / ICO / PDF</li>
-          </ul>
-        </div>
-        <div>
-          <strong>PDF</strong>
-          <ul>
-            <li>PDF → PNG / JPG / JPEG / TXT</li>
-            <li>PNG / JPG / JPEG / ICO → PDF</li>
-          </ul>
-        </div>
-        <div>
-          <strong>Office files</strong>
-          <ul>
-            <li>DOCX → PDF / TXT</li>
-            <li>XLSX → PDF / CSV / TXT</li>
-          </ul>
-        </div>
-      </div>
-      <p class="muted note-text">
-        DOCX and XLSX to PDF are generated in-browser, so complex layouts, advanced formulas, charts,
-        comments, tracked changes, or embedded objects may be simplified.
-      </p>
-    </section>
+        <section class="card notes-card">
+          <div class="section-heading compact">
+            <div>
+              <div class="section-kicker">Supported</div>
+              <h2>Conversion matrix</h2>
+            </div>
+          </div>
+
+          <div class="support-grid">
+            <div class="support-item">
+              <strong>Images / ICO</strong>
+              <ul>
+                <li>PNG ⇄ JPG / JPEG / ICO / PDF</li>
+                <li>JPG / JPEG ⇄ PNG / ICO / PDF</li>
+                <li>ICO → PNG / JPG / JPEG / ICO / PDF</li>
+              </ul>
+            </div>
+            <div class="support-item">
+              <strong>PDF</strong>
+              <ul>
+                <li>PDF → PNG / JPG / JPEG / TXT</li>
+                <li>PNG / JPG / JPEG / ICO → PDF</li>
+              </ul>
+            </div>
+            <div class="support-item">
+              <strong>Office files</strong>
+              <ul>
+                <li>DOCX → PDF / TXT</li>
+                <li>XLSX → PDF / CSV / TXT</li>
+              </ul>
+            </div>
+          </div>
+
+          <p class="muted note-text">
+            DOCX and XLSX to PDF are generated in-browser, so complex layouts, formulas, charts,
+            comments, tracked changes, or embedded objects may be simplified.
+          </p>
+        </section>
+      </section>
+    </main>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>

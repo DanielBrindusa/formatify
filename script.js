@@ -14,6 +14,7 @@ const convertBtn = document.getElementById('convertBtn');
 const resetBtn = document.getElementById('resetBtn');
 const previewBox = document.getElementById('previewBox');
 const resultBox = document.getElementById('resultBox');
+const statusBadge = document.getElementById('statusBadge');
 
 const IMAGE_TYPES = ['png', 'jpg', 'jpeg', 'ico'];
 const MATRIX = {
@@ -48,6 +49,7 @@ async function handleFileSelection(event) {
 
   if (!loadedType || !MATRIX[loadedType]) {
     previewState = null;
+    syncVisibleControls(null);
     setStatus('This file type is not supported.', true);
     renderPreviewMessage('Unsupported file type');
     outputFormat.innerHTML = '';
@@ -55,6 +57,7 @@ async function handleFileSelection(event) {
   }
 
   updateOutputOptions(loadedType);
+  syncVisibleControls(loadedType);
   setStatus('Loading preview...');
 
   try {
@@ -123,6 +126,22 @@ function updateOutputOptions(type) {
   outputFormat.innerHTML = options
     .map((value) => `<option value="${value}">${value.toUpperCase()}</option>`)
     .join('');
+}
+
+function syncVisibleControls(type) {
+  const isImage = IMAGE_TYPES.includes(type);
+  const isPdf = type === 'pdf';
+  toggleHidden('imageSizeField', !isImage);
+  toggleHidden('transparencyField', !isImage);
+  toggleHidden('downloadAllImagesField', !isImage);
+  toggleHidden('pdfScaleField', !isPdf);
+  toggleHidden('mergePdfImagesField', !isPdf);
+}
+
+function toggleHidden(id, hidden) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('is-hidden', hidden);
 }
 
 async function buildPreviewState(file, type) {
@@ -577,6 +596,25 @@ function makeTextResult(filename, text, mime = 'text/plain;charset=utf-8') {
 
 function setStatus(message, isError = false) {
   resultBox.innerHTML = `<div class="status ${isError ? 'error' : ''}">${escapeHtml(message)}</div>`;
+
+  if (!statusBadge) return;
+  statusBadge.textContent = message;
+  statusBadge.className = 'status-badge';
+
+  if (isError) {
+    statusBadge.classList.add('error');
+    return;
+  }
+
+  if (/converting/i.test(message) || /loading/i.test(message)) {
+    statusBadge.classList.add('busy');
+  } else if (/ready/i.test(message)) {
+    statusBadge.classList.add('ready');
+  } else if (/complete/i.test(message)) {
+    statusBadge.classList.add('success');
+  } else {
+    statusBadge.classList.add('idle');
+  }
 }
 
 function sanitizeHtml(html) {
@@ -603,6 +641,7 @@ function resetAll() {
   previewState = null;
   inputType.value = 'No file selected';
   updateOutputOptions('png');
+  syncVisibleControls('png');
   renderPreviewMessage('No file loaded');
   resultBox.innerHTML = '<p class="muted">Converted files will appear here.</p>';
 }
