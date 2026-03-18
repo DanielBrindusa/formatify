@@ -14,10 +14,24 @@ const convertBtn = document.getElementById('convertBtn');
 const resetBtn = document.getElementById('resetBtn');
 const previewBox = document.getElementById('previewBox');
 const resultBox = document.getElementById('resultBox');
-const statusBox = document.getElementById('statusBox');
-const topAds = document.getElementById('topAds');
-const sidebarAd = document.getElementById('sidebarAd');
-const bottomAds = document.getElementById('bottomAds');
+const statusBadge = document.getElementById('statusBadge');
+
+const adStripTop = document.getElementById('adStripTop');
+const adStripBottom = document.getElementById('adStripBottom');
+const adSidebarInfo = document.getElementById('adSidebarInfo');
+const adsAdminDialog = document.getElementById('adsAdminDialog');
+const openAdsAdminBtn = document.getElementById('openAdsAdminBtn');
+const closeAdsAdminBtn = document.getElementById('closeAdsAdminBtn');
+const unlockAdsAdminBtn = document.getElementById('unlockAdsAdminBtn');
+const adsAdminPassword = document.getElementById('adsAdminPassword');
+const adsAdminEditorWrap = document.getElementById('adsAdminEditorWrap');
+const adsConfigEditor = document.getElementById('adsConfigEditor');
+const loadAdsConfigBtn = document.getElementById('loadAdsConfigBtn');
+const downloadAdsConfigBtn = document.getElementById('downloadAdsConfigBtn');
+
+const DEFAULT_ADS_PASSWORD = 'formatify-admin';
+const ADS_CONFIG_PATH = './ads-config.json';
+let currentAdsConfig = null;
 
 const IMAGE_TYPES = ['png', 'jpg', 'jpeg', 'ico'];
 const MATRIX = {
@@ -38,8 +52,13 @@ let previewState = null;
 fileInput.addEventListener('change', handleFileSelection);
 convertBtn.addEventListener('click', handleConvert);
 resetBtn.addEventListener('click', resetAll);
+openAdsAdminBtn?.addEventListener('click', () => adsAdminDialog?.showModal());
+closeAdsAdminBtn?.addEventListener('click', () => adsAdminDialog?.close());
+unlockAdsAdminBtn?.addEventListener('click', unlockAdsEditor);
+loadAdsConfigBtn?.addEventListener('click', loadConfigIntoEditor);
+downloadAdsConfigBtn?.addEventListener('click', downloadAdsConfigFile);
 
-loadAds();
+await initAds();
 resetAll();
 
 async function handleFileSelection(event) {
@@ -53,6 +72,7 @@ async function handleFileSelection(event) {
 
   if (!loadedType || !MATRIX[loadedType]) {
     previewState = null;
+    syncVisibleControls(null);
     setStatus('This file type is not supported.', true);
     renderPreviewMessage('Unsupported file type');
     outputFormat.innerHTML = '';
@@ -60,6 +80,7 @@ async function handleFileSelection(event) {
   }
 
   updateOutputOptions(loadedType);
+  syncVisibleControls(loadedType);
   setStatus('Loading preview...');
 
   try {
@@ -102,7 +123,6 @@ async function handleConvert() {
     }
 
     renderResults(results);
-    setStatus('Conversion complete.');
   } catch (error) {
     console.error(error);
     setStatus(`Conversion failed: ${error.message}`, true);
@@ -128,6 +148,22 @@ function updateOutputOptions(type) {
   outputFormat.innerHTML = options
     .map((value) => `<option value="${value}">${value.toUpperCase()}</option>`)
     .join('');
+}
+
+function syncVisibleControls(type) {
+  const isImage = IMAGE_TYPES.includes(type);
+  const isPdf = type === 'pdf';
+  toggleHidden('imageSizeField', !isImage);
+  toggleHidden('transparencyField', !isImage);
+  toggleHidden('downloadAllImagesField', !isImage);
+  toggleHidden('pdfScaleField', !isPdf);
+  toggleHidden('mergePdfImagesField', !isPdf);
+}
+
+function toggleHidden(id, hidden) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('is-hidden', hidden);
 }
 
 async function buildPreviewState(file, type) {
@@ -213,7 +249,7 @@ async function fileToImage(file) {
 }
 
 async function convertImageInput(image, formats) {
-  const size = Number(iconSize.value || 256);
+  const selectedSize = iconSize.value || 'original';
   const files = [];
 
   for (const format of formats) {
@@ -223,8 +259,9 @@ async function convertImageInput(image, formats) {
       continue;
     }
 
-    const blob = await convertImage(image, format, size, preserveTransparency.checked);
-    files.push(makeFileResult(`${loadedFileName}-${size}x${size}.${format}`, format.toUpperCase(), blob));
+    const blob = await convertImage(image, format, selectedSize, preserveTransparency.checked);
+    const filenameSuffix = getImageSizeFilenameSuffix(selectedSize, image);
+    files.push(makeFileResult(`${loadedFileName}${filenameSuffix}.${format}`, format.toUpperCase(), blob));
   }
 
   return files;
@@ -293,33 +330,67 @@ async function convertXlsxInput(file, format) {
   return [makeFileResult(`${loadedFileName}.pdf`, 'PDF', pdfBlob, `Sheet: ${firstSheetName}`)];
 }
 
-async function convertImage(img, format, size, keepTransparency) {
+async function convertImage(img, format, requestedSize, keepTransparency) {
+  const size = getTargetImageSize(requestedSize, img);
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = size.width;
+  canvas.height = size.height;
   const ctx = canvas.getContext('2d');
 
   if (format === 'jpg' || format === 'jpeg' || !keepTransparency) {
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, size.width, size.height);
   }
 
-  const ratio = Math.min(size / img.width, size / img.height);
+  const ratio = Math.min(size.width / img.width, size.height / img.height);
   const drawWidth = Math.max(1, Math.round(img.width * ratio));
   const drawHeight = Math.max(1, Math.round(img.height * ratio));
-  const dx = Math.round((size - drawWidth) / 2);
-  const dy = Math.round((size - drawHeight) / 2);
+  const dx = Math.round((size.width - drawWidth) / 2);
+  const dy = Math.round((size.height - drawHeight) / 2);
   ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
 
   if (format === 'ico') {
     const pngBlob = await canvasToBlob(canvas, 'image/png');
-    return pngBlobToIco(pngBlob, size);
+    const icoSize = normalizeIcoSize(requestedSize, size);
+    return pngBlobToIco(pngBlob, icoSize);
   }
 
   const mime = format === 'png' ? 'image/png' : 'image/jpeg';
   return canvasToBlob(canvas, mime, 0.92);
 }
 
+
+function getTargetImageSize(requestedSize, img) {
+  if (requestedSize === 'original') {
+    return {
+      width: img.naturalWidth || img.width,
+      height: img.naturalHeight || img.height
+    };
+  }
+
+  const numericSize = Number(requestedSize || 256);
+  return { width: numericSize, height: numericSize };
+}
+
+function getImageSizeFilenameSuffix(requestedSize, img) {
+  if (requestedSize === 'original') {
+    const width = img.naturalWidth || img.width;
+    const height = img.naturalHeight || img.height;
+    return `-original-${width}x${height}`;
+  }
+
+  return `-${requestedSize}x${requestedSize}`;
+}
+
+function normalizeIcoSize(requestedSize, actualSize) {
+  if (requestedSize === 'original') {
+    const maxDimension = Math.max(actualSize.width, actualSize.height);
+    const icoSizes = [16, 32, 48, 64, 128, 256];
+    return icoSizes.find((size) => size >= maxDimension) || 256;
+  }
+
+  return Number(requestedSize || 256);
+}
 function canvasToBlob(canvas, mime, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -546,9 +617,28 @@ function makeTextResult(filename, text, mime = 'text/plain;charset=utf-8') {
 }
 
 function setStatus(message, isError = false) {
-  if (!statusBox) return;
-  statusBox.className = `status ${isError ? 'error' : 'info'}`;
-  statusBox.textContent = message;
+  if (isError || /converting|loading|choose a file|unsupported/i.test(message)) {
+    resultBox.innerHTML = `<div class="status ${isError ? 'error' : ''}">${escapeHtml(message)}</div>`;
+  }
+
+  if (!statusBadge) return;
+  statusBadge.textContent = message;
+  statusBadge.className = 'status-badge';
+
+  if (isError) {
+    statusBadge.classList.add('error');
+    return;
+  }
+
+  if (/converting/i.test(message) || /loading/i.test(message)) {
+    statusBadge.classList.add('busy');
+  } else if (/ready/i.test(message)) {
+    statusBadge.classList.add('ready');
+  } else if (/complete/i.test(message)) {
+    statusBadge.classList.add('success');
+  } else {
+    statusBadge.classList.add('idle');
+  }
 }
 
 function sanitizeHtml(html) {
@@ -567,6 +657,155 @@ function escapeHtml(value) {
   }[char]));
 }
 
+
+async function initAds() {
+  try {
+    const response = await fetch(`${ADS_CONFIG_PATH}?v=${Date.now()}`);
+    if (!response.ok) throw new Error('ads-config.json could not be loaded.');
+    currentAdsConfig = await response.json();
+  } catch (error) {
+    console.error(error);
+    currentAdsConfig = getFallbackAdsConfig();
+  }
+
+  renderAds(currentAdsConfig);
+  loadConfigIntoEditor();
+}
+
+function getFallbackAdsConfig() {
+  return {
+    adminPassword: DEFAULT_ADS_PASSWORD,
+    slots: {
+      top: [
+        {
+          enabled: true,
+          label: 'Featured',
+          title: 'Promote your premium converter offer',
+          text: 'Use this space for your own product, service, affiliate, announcement, or sponsor message.',
+          buttonText: 'Learn more',
+          url: '#'
+        },
+        {
+          enabled: true,
+          label: 'Tools',
+          title: 'Share another useful tool from your brand',
+          text: 'Perfect for cross-promotion, featured updates, partner links, or limited-time offers.',
+          buttonText: 'Open',
+          url: '#'
+        }
+      ],
+      sidebar: {
+        enabled: true,
+        label: 'Spotlight',
+        title: 'Highlight a trusted recommendation',
+        text: 'This smaller card works well for one compact internal ad or announcement.',
+        buttonText: 'See details',
+        url: '#'
+      },
+      bottom: [
+        {
+          enabled: true,
+          label: 'New',
+          title: 'Announce a new feature or product',
+          text: 'Keep your audience aware of launches without touching the main app layout.',
+          buttonText: 'Check it out',
+          url: '#'
+        }
+      ]
+    }
+  };
+}
+
+function renderAds(config) {
+  renderAdGroup(adStripTop, config?.slots?.top || []);
+  renderAdGroup(adStripBottom, config?.slots?.bottom || []);
+  renderSingleAd(adSidebarInfo, config?.slots?.sidebar || null, true);
+}
+
+function renderAdGroup(container, items) {
+  if (!container) return;
+  const enabledItems = (items || []).filter((item) => item && item.enabled !== false);
+  if (!enabledItems.length) {
+    container.innerHTML = '';
+    container.classList.add('ad-empty');
+    return;
+  }
+
+  container.classList.remove('ad-empty');
+  container.innerHTML = enabledItems.map((item) => getAdCardMarkup(item)).join('');
+}
+
+function renderSingleAd(container, item, compact = false) {
+  if (!container) return;
+  if (!item || item.enabled === false) {
+    container.innerHTML = '';
+    container.classList.add('ad-empty');
+    return;
+  }
+
+  container.classList.remove('ad-empty');
+  container.innerHTML = getAdCardMarkup(item, compact);
+}
+
+function getAdCardMarkup(item, compact = false) {
+  const label = escapeHtml(item.label || 'Featured');
+  const title = escapeHtml(item.title || 'Your promotion goes here');
+  const text = escapeHtml(item.text || 'Update this area from ads-config.json.');
+  const buttonText = escapeHtml(item.buttonText || 'Open');
+  const href = escapeHtml(item.url || '#');
+  return `
+    <article class="ad-slot ${compact ? 'compact-ad' : ''}">
+      <div class="ad-slot-inner">
+        <div class="ad-copy">
+          <span class="ad-label">${label}</span>
+          <h3 class="ad-title">${title}</h3>
+          <p class="ad-text">${text}</p>
+        </div>
+        <a class="ad-cta" href="${href}" target="_blank" rel="noopener noreferrer">${buttonText}</a>
+      </div>
+    </article>
+  `;
+}
+
+function unlockAdsEditor() {
+  const typedPassword = adsAdminPassword?.value || '';
+  const expectedPassword = currentAdsConfig?.adminPassword || DEFAULT_ADS_PASSWORD;
+
+  if (typedPassword !== expectedPassword) {
+    alert('Wrong admin password.');
+    return;
+  }
+
+  adsAdminEditorWrap?.classList.remove('is-hidden');
+  loadConfigIntoEditor();
+}
+
+function loadConfigIntoEditor() {
+  if (!adsConfigEditor) return;
+  adsConfigEditor.value = JSON.stringify(currentAdsConfig || getFallbackAdsConfig(), null, 2);
+}
+
+function downloadAdsConfigFile() {
+  if (!adsConfigEditor) return;
+
+  try {
+    const parsed = JSON.parse(adsConfigEditor.value);
+    currentAdsConfig = parsed;
+    renderAds(currentAdsConfig);
+
+    const blob = new Blob([JSON.stringify(parsed, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'ads-config.json';
+    link.click();
+    URL.revokeObjectURL(url);
+    setStatus('Ads config ready. Upload ads-config.json to GitHub to publish it for everyone.');
+  } catch (error) {
+    alert(`Invalid JSON: ${error.message}`);
+  }
+}
+
 function resetAll() {
   fileInput.value = '';
   loadedFile = null;
@@ -575,66 +814,7 @@ function resetAll() {
   previewState = null;
   inputType.value = 'No file selected';
   updateOutputOptions('png');
+  syncVisibleControls('png');
   renderPreviewMessage('No file loaded');
   resultBox.innerHTML = '<p class="muted">Converted files will appear here.</p>';
-  setStatus('Ready to use.');
-}
-
-
-async function loadAds() {
-  try {
-    const response = await fetch('ads-config.json', { cache: 'no-store' });
-    if (!response.ok) throw new Error('Ad config not found');
-    const config = await response.json();
-    renderAdSlotList(topAds, config?.slots?.top, 'You can place featured ads here.');
-    renderSingleAdSlot(sidebarAd, config?.slots?.sidebar, 'This sidebar can hold one compact ad or internal promotion.');
-    renderAdSlotList(bottomAds, config?.slots?.bottom, 'You can place additional ads here.');
-  } catch (error) {
-    console.warn('Ads could not be loaded.', error);
-    renderAdSlotList(topAds, [], 'Add ads later with ads-config.json.');
-    renderSingleAdSlot(sidebarAd, null, 'Add a sidebar ad later with ads-config.json.');
-    renderAdSlotList(bottomAds, [], 'Add ads later with ads-config.json.');
-  }
-}
-
-function renderAdSlotList(container, items, placeholderText) {
-  if (!container) return;
-  const enabledItems = Array.isArray(items) ? items.filter((item) => item && item.enabled) : [];
-  container.innerHTML = '';
-  if (!enabledItems.length) {
-    container.innerHTML = `<div class="ad-placeholder">${escapeHtml(placeholderText)}</div>`;
-    return;
-  }
-  enabledItems.forEach((item) => container.appendChild(buildAdCard(item)));
-}
-
-function renderSingleAdSlot(container, item, placeholderText) {
-  if (!container) return;
-  container.innerHTML = '';
-  if (!item || !item.enabled) {
-    container.innerHTML = `<div class="ad-placeholder">${escapeHtml(placeholderText)}</div>`;
-    return;
-  }
-  container.appendChild(buildAdCard(item));
-}
-
-function buildAdCard(item) {
-  const card = document.createElement('article');
-  card.className = 'ad-card';
-
-  const safeLabel = escapeHtml(item.label || 'Featured');
-  const safeTitle = escapeHtml(item.title || 'Your message here');
-  const safeText = escapeHtml(item.text || 'Use this space for an ad, affiliate link, promotion, or announcement.');
-  const safeButtonText = escapeHtml(item.buttonText || 'Open');
-  const rawUrl = typeof item.url === 'string' && item.url.trim() ? item.url.trim() : '#';
-  const safeUrl = /^(https?:\/\/|#|mailto:)/i.test(rawUrl) ? rawUrl : '#';
-
-  card.innerHTML = `
-    <div class="ad-label">${safeLabel}</div>
-    <h3>${safeTitle}</h3>
-    <p>${safeText}</p>
-    <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeButtonText}</a>
-  `;
-
-  return card;
 }
