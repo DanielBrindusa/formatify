@@ -100,7 +100,6 @@ async function handleConvert() {
     }
 
     renderResults(results);
-    setStatus('Conversion complete.');
   } catch (error) {
     console.error(error);
     setStatus(`Conversion failed: ${error.message}`, true);
