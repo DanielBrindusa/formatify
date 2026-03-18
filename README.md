@@ -1,5 +1,9 @@
 # Universal File Converter
 
-Now supports:
+## Features
 - Image conversion (PNG, JPG, JPEG, ICO)
-- Custom sizes + ORIGINAL SIZE option
+- Output size options including ORIGINAL SIZE
+- Works fully in browser (no backend)
+
+## Usage
+Upload file → choose format → choose size → convert

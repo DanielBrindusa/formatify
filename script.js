@@ -1,48 +1,45 @@
-function convertImage() {
-    const fileInput = document.getElementById("fileInput");
-    const format = document.getElementById("format").value;
-    const sizeOption = document.getElementById("outputSize").value;
+function convertFile() {
+    const file = document.getElementById("fileInput").files[0];
+    const format = document.getElementById("formatSelect").value;
+    const size = document.getElementById("sizeSelect").value;
 
-    const file = fileInput.files[0];
-    if (!file) {
-        alert("Please upload a file");
-        return;
-    }
+    if (!file) return alert("Upload a file");
 
     const img = new Image();
-    img.src = URL.createObjectURL(file);
+    const reader = new FileReader();
 
-    img.onload = function () {
-        let width, height;
+    reader.onload = function(e) {
+        img.src = e.target.result;
+    };
 
-        if (sizeOption === "original") {
-            width = img.naturalWidth;
-            height = img.naturalHeight;
-        } else {
-            width = parseInt(sizeOption);
-            height = parseInt(sizeOption);
-        }
-
+    img.onload = function() {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
+
+        let width = img.width;
+        let height = img.height;
+
+        if (size !== "original") {
+            width = parseInt(size);
+            height = parseInt(size);
+        }
 
         canvas.width = width;
         canvas.height = height;
 
         ctx.drawImage(img, 0, 0, width, height);
 
-        const link = document.getElementById("downloadLink");
-
-        if (format === "ico" && sizeOption === "original") {
-            alert("For best compatibility, ICO files should use standard sizes (16–256px).");
-        }
-
         let mime = "image/png";
         if (format === "jpg" || format === "jpeg") mime = "image/jpeg";
 
-        link.href = canvas.toDataURL(mime);
+        const dataUrl = canvas.toDataURL(mime);
+
+        const link = document.getElementById("downloadLink");
+        link.href = dataUrl;
         link.download = "converted." + format;
         link.style.display = "block";
-        link.innerText = "Download " + format.toUpperCase();
+        link.innerText = "Download File";
     };
+
+    reader.readAsDataURL(file);
 }

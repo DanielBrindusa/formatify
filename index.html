@@ -1,43 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Universal File Converter</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal File Converter</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h2>Universal File Converter</h2>
+<div class="container">
+    <h1>Universal File Converter</h1>
 
-<input type="file" id="fileInput"><br><br>
+    <input type="file" id="fileInput">
 
-<label>Output Format:</label>
-<select id="format">
-  <option value="png">PNG</option>
-  <option value="jpg">JPG</option>
-  <option value="jpeg">JPEG</option>
-  <option value="ico">ICO</option>
-</select>
+    <label>Convert to:</label>
+    <select id="formatSelect">
+        <option value="png">PNG</option>
+        <option value="jpg">JPG</option>
+        <option value="jpeg">JPEG</option>
+        <option value="ico">ICO</option>
+        <option value="pdf">PDF</option>
+        <option value="txt">TEXT</option>
+    </select>
 
-<br><br>
+    <div id="sizeOptions">
+        <label>Output size:</label>
+        <select id="sizeSelect">
+            <option value="original">Original Size</option>
+            <option value="256">256x256</option>
+            <option value="128">128x128</option>
+            <option value="64">64x64</option>
+            <option value="32">32x32</option>
+        </select>
+    </div>
 
-<label>Output Size:</label>
-<select id="outputSize">
-  <option value="16">16x16</option>
-  <option value="32">32x32</option>
-  <option value="64">64x64</option>
-  <option value="128">128x128</option>
-  <option value="256">256x256</option>
-  <option value="original">Original Size</option>
-</select>
+    <button onclick="convertFile()">Convert</button>
 
-<br><br>
-
-<button onclick="convertImage()">Convert</button>
-
-<br><br>
-
-<a id="downloadLink" style="display:none">Download</a>
+    <a id="downloadLink" style="display:none">Download</a>
+</div>
 
 <script src="script.js"></script>
 </body>
