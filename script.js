@@ -16,6 +16,23 @@ const previewBox = document.getElementById('previewBox');
 const resultBox = document.getElementById('resultBox');
 const statusBadge = document.getElementById('statusBadge');
 
+const adStripTop = document.getElementById('adStripTop');
+const adStripBottom = document.getElementById('adStripBottom');
+const adSidebarInfo = document.getElementById('adSidebarInfo');
+const adsAdminDialog = document.getElementById('adsAdminDialog');
+const openAdsAdminBtn = document.getElementById('openAdsAdminBtn');
+const closeAdsAdminBtn = document.getElementById('closeAdsAdminBtn');
+const unlockAdsAdminBtn = document.getElementById('unlockAdsAdminBtn');
+const adsAdminPassword = document.getElementById('adsAdminPassword');
+const adsAdminEditorWrap = document.getElementById('adsAdminEditorWrap');
+const adsConfigEditor = document.getElementById('adsConfigEditor');
+const loadAdsConfigBtn = document.getElementById('loadAdsConfigBtn');
+const downloadAdsConfigBtn = document.getElementById('downloadAdsConfigBtn');
+
+const DEFAULT_ADS_PASSWORD = 'formatify-admin';
+const ADS_CONFIG_PATH = './ads-config.json';
+let currentAdsConfig = null;
+
 const IMAGE_TYPES = ['png', 'jpg', 'jpeg', 'ico'];
 const MATRIX = {
   png: ['png', 'jpg', 'jpeg', 'ico', 'pdf'],
@@ -35,7 +52,13 @@ let previewState = null;
 fileInput.addEventListener('change', handleFileSelection);
 convertBtn.addEventListener('click', handleConvert);
 resetBtn.addEventListener('click', resetAll);
+openAdsAdminBtn?.addEventListener('click', () => adsAdminDialog?.showModal());
+closeAdsAdminBtn?.addEventListener('click', () => adsAdminDialog?.close());
+unlockAdsAdminBtn?.addEventListener('click', unlockAdsEditor);
+loadAdsConfigBtn?.addEventListener('click', loadConfigIntoEditor);
+downloadAdsConfigBtn?.addEventListener('click', downloadAdsConfigFile);
 
+await initAds();
 resetAll();
 
 async function handleFileSelection(event) {
@@ -595,7 +618,9 @@ function makeTextResult(filename, text, mime = 'text/plain;charset=utf-8') {
 }
 
 function setStatus(message, isError = false) {
-  resultBox.innerHTML = `<div class="status ${isError ? 'error' : ''}">${escapeHtml(message)}</div>`;
+  if (isError || /converting|loading|choose a file|unsupported/i.test(message)) {
+    resultBox.innerHTML = `<div class="status ${isError ? 'error' : ''}">${escapeHtml(message)}</div>`;
+  }
 
   if (!statusBadge) return;
   statusBadge.textContent = message;
@@ -633,15 +658,166 @@ function escapeHtml(value) {
   }[char]));
 }
 
+
+async function initAds() {
+  try {
+    const response = await fetch(`${ADS_CONFIG_PATH}?v=${Date.now()}`);
+    if (!response.ok) throw new Error('ads-config.json could not be loaded.');
+    currentAdsConfig = await response.json();
+  } catch (error) {
+    console.error(error);
+    currentAdsConfig = getFallbackAdsConfig();
+  }
+
+  renderAds(currentAdsConfig);
+  loadConfigIntoEditor();
+}
+
+function getFallbackAdsConfig() {
+  return {
+    adminPassword: DEFAULT_ADS_PASSWORD,
+    slots: {
+      top: [
+        {
+          enabled: true,
+          label: 'Featured',
+          title: 'Promote your premium converter offer',
+          text: 'Use this space for your own product, service, affiliate, announcement, or sponsor message.',
+          buttonText: 'Learn more',
+          url: '#'
+        },
+        {
+          enabled: true,
+          label: 'Tools',
+          title: 'Share another useful tool from your brand',
+          text: 'Perfect for cross-promotion, featured updates, partner links, or limited-time offers.',
+          buttonText: 'Open',
+          url: '#'
+        }
+      ],
+      sidebar: {
+        enabled: true,
+        label: 'Spotlight',
+        title: 'Highlight a trusted recommendation',
+        text: 'This smaller card works well for one compact internal ad or announcement.',
+        buttonText: 'See details',
+        url: '#'
+      },
+      bottom: [
+        {
+          enabled: true,
+          label: 'New',
+          title: 'Announce a new feature or product',
+          text: 'Keep your audience aware of launches without touching the main app layout.',
+          buttonText: 'Check it out',
+          url: '#'
+        }
+      ]
+    }
+  };
+}
+
+function renderAds(config) {
+  renderAdGroup(adStripTop, config?.slots?.top || []);
+  renderAdGroup(adStripBottom, config?.slots?.bottom || []);
+  renderSingleAd(adSidebarInfo, config?.slots?.sidebar || null, true);
+}
+
+function renderAdGroup(container, items) {
+  if (!container) return;
+  const enabledItems = (items || []).filter((item) => item && item.enabled !== false);
+  if (!enabledItems.length) {
+    container.innerHTML = '';
+    container.classList.add('ad-empty');
+    return;
+  }
+
+  container.classList.remove('ad-empty');
+  container.innerHTML = enabledItems.map((item) => getAdCardMarkup(item)).join('');
+}
+
+function renderSingleAd(container, item, compact = false) {
+  if (!container) return;
+  if (!item || item.enabled === false) {
+    container.innerHTML = '';
+    container.classList.add('ad-empty');
+    return;
+  }
+
+  container.classList.remove('ad-empty');
+  container.innerHTML = getAdCardMarkup(item, compact);
+}
+
+function getAdCardMarkup(item, compact = false) {
+  const label = escapeHtml(item.label || 'Featured');
+  const title = escapeHtml(item.title || 'Your promotion goes here');
+  const text = escapeHtml(item.text || 'Update this area from ads-config.json.');
+  const buttonText = escapeHtml(item.buttonText || 'Open');
+  const href = escapeHtml(item.url || '#');
+  return `
+    <article class="ad-slot ${compact ? 'compact-ad' : ''}">
+      <div class="ad-slot-inner">
+        <div class="ad-copy">
+          <span class="ad-label">${label}</span>
+          <h3 class="ad-title">${title}</h3>
+          <p class="ad-text">${text}</p>
+        </div>
+        <a class="ad-cta" href="${href}" target="_blank" rel="noopener noreferrer">${buttonText}</a>
+      </div>
+    </article>
+  `;
+}
+
+function unlockAdsEditor() {
+  const typedPassword = adsAdminPassword?.value || '';
+  const expectedPassword = currentAdsConfig?.adminPassword || DEFAULT_ADS_PASSWORD;
+
+  if (typedPassword !== expectedPassword) {
+    alert('Wrong admin password.');
+    return;
+  }
+
+  adsAdminEditorWrap?.classList.remove('is-hidden');
+  loadConfigIntoEditor();
+}
+
+function loadConfigIntoEditor() {
+  if (!adsConfigEditor) return;
+  adsConfigEditor.value = JSON.stringify(currentAdsConfig || getFallbackAdsConfig(), null, 2);
+}
+
+function downloadAdsConfigFile() {
+  if (!adsConfigEditor) return;
+
+  try {
+    const parsed = JSON.parse(adsConfigEditor.value);
+    currentAdsConfig = parsed;
+    renderAds(currentAdsConfig);
+
+    const blob = new Blob([JSON.stringify(parsed, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'ads-config.json';
+    link.click();
+    URL.revokeObjectURL(url);
+    setStatus('Ads config ready. Upload ads-config.json to GitHub to publish it for everyone.');
+  } catch (error) {
+    alert(`Invalid JSON: ${error.message}`);
+  }
+}
+
 function resetAll() {
   fileInput.value = '';
   loadedFile = null;
   loadedType = null;
   loadedFileName = 'file';
   previewState = null;
+  convertBtn.disabled = false;
   inputType.value = 'No file selected';
   updateOutputOptions('png');
   syncVisibleControls('png');
   renderPreviewMessage('No file loaded');
   resultBox.innerHTML = '<p class="muted">Converted files will appear here.</p>';
+  setStatus('Ready to convert.');
 }
