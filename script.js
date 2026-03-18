@@ -1,45 +1,608 @@
-function convertFile() {
-    const file = document.getElementById("fileInput").files[0];
-    const format = document.getElementById("formatSelect").value;
-    const size = document.getElementById("sizeSelect").value;
+const { jsPDF } = window.jspdf;
+const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.min.mjs');
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.mjs';
 
-    if (!file) return alert("Upload a file");
+const fileInput = document.getElementById('fileInput');
+const inputType = document.getElementById('inputType');
+const outputFormat = document.getElementById('outputFormat');
+const iconSize = document.getElementById('iconSize');
+const pdfScale = document.getElementById('pdfScale');
+const preserveTransparency = document.getElementById('preserveTransparency');
+const mergePdfImages = document.getElementById('mergePdfImages');
+const downloadAllImages = document.getElementById('downloadAllImages');
+const convertBtn = document.getElementById('convertBtn');
+const resetBtn = document.getElementById('resetBtn');
+const previewBox = document.getElementById('previewBox');
+const resultBox = document.getElementById('resultBox');
 
+const IMAGE_TYPES = ['png', 'jpg', 'jpeg', 'ico'];
+const MATRIX = {
+  png: ['png', 'jpg', 'jpeg', 'ico', 'pdf'],
+  jpg: ['png', 'jpg', 'jpeg', 'ico', 'pdf'],
+  jpeg: ['png', 'jpg', 'jpeg', 'ico', 'pdf'],
+  ico: ['png', 'jpg', 'jpeg', 'ico', 'pdf'],
+  pdf: ['png', 'jpg', 'jpeg', 'txt'],
+  docx: ['pdf', 'txt'],
+  xlsx: ['pdf', 'csv', 'txt']
+};
+
+let loadedFile = null;
+let loadedType = null;
+let loadedFileName = 'file';
+let previewState = null;
+
+fileInput.addEventListener('change', handleFileSelection);
+convertBtn.addEventListener('click', handleConvert);
+resetBtn.addEventListener('click', resetAll);
+
+resetAll();
+
+async function handleFileSelection(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  loadedFile = file;
+  loadedFileName = file.name.replace(/\.[^.]+$/, '') || 'file';
+  loadedType = detectFileType(file);
+  inputType.value = loadedType ? loadedType.toUpperCase() : 'Unsupported';
+
+  if (!loadedType || !MATRIX[loadedType]) {
+    previewState = null;
+    setStatus('This file type is not supported.', true);
+    renderPreviewMessage('Unsupported file type');
+    outputFormat.innerHTML = '';
+    return;
+  }
+
+  updateOutputOptions(loadedType);
+  setStatus('Loading preview...');
+
+  try {
+    previewState = await buildPreviewState(file, loadedType);
+    renderPreview(previewState);
+    setStatus('Ready to convert.');
+  } catch (error) {
+    console.error(error);
+    previewState = null;
+    renderPreviewMessage('Preview could not be generated');
+    setStatus(`Preview failed: ${error.message}`, true);
+  }
+}
+
+async function handleConvert() {
+  if (!loadedFile || !loadedType) {
+    setStatus('Please choose a file first.', true);
+    return;
+  }
+
+  convertBtn.disabled = true;
+  setStatus('Converting...');
+
+  try {
+    const format = outputFormat.value;
+    let results = [];
+
+    if (IMAGE_TYPES.includes(loadedType)) {
+      const formats = downloadAllImages.checked ? ['png', 'jpg', 'jpeg', 'ico', 'pdf'] : [format];
+      const image = previewState?.image || await fileToImage(loadedFile);
+      results = await convertImageInput(image, formats);
+    } else if (loadedType === 'pdf') {
+      results = await convertPdfInput(loadedFile, format);
+    } else if (loadedType === 'docx') {
+      results = await convertDocxInput(loadedFile, format);
+    } else if (loadedType === 'xlsx') {
+      results = await convertXlsxInput(loadedFile, format);
+    } else {
+      throw new Error('Unsupported conversion path.');
+    }
+
+    renderResults(results);
+    setStatus('Conversion complete.');
+  } catch (error) {
+    console.error(error);
+    setStatus(`Conversion failed: ${error.message}`, true);
+  } finally {
+    convertBtn.disabled = false;
+  }
+}
+
+function detectFileType(file) {
+  const name = (file.name || '').toLowerCase();
+  if (name.endsWith('.png')) return 'png';
+  if (name.endsWith('.jpg')) return 'jpg';
+  if (name.endsWith('.jpeg')) return 'jpeg';
+  if (name.endsWith('.ico')) return 'ico';
+  if (name.endsWith('.pdf')) return 'pdf';
+  if (name.endsWith('.docx')) return 'docx';
+  if (name.endsWith('.xlsx')) return 'xlsx';
+  return null;
+}
+
+function updateOutputOptions(type) {
+  const options = MATRIX[type] || [];
+  outputFormat.innerHTML = options
+    .map((value) => `<option value="${value}">${value.toUpperCase()}</option>`)
+    .join('');
+}
+
+async function buildPreviewState(file, type) {
+  if (IMAGE_TYPES.includes(type)) {
+    return { kind: 'image', image: await fileToImage(file) };
+  }
+
+  if (type === 'pdf') {
+    const pdf = await loadPdf(file);
+    const firstPageCanvas = await renderPdfPageToCanvas(pdf, 1, Number(pdfScale.value));
+    return { kind: 'pdf', pdf, firstPageCanvas, pageCount: pdf.numPages };
+  }
+
+  if (type === 'docx') {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await window.mammoth.convertToHtml({ arrayBuffer });
+    return { kind: 'docx', html: sanitizeHtml(result.value), messages: result.messages || [] };
+  }
+
+  if (type === 'xlsx') {
+    const workbook = await readWorkbook(file);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const html = window.XLSX.utils.sheet_to_html(sheet);
+    return { kind: 'xlsx', workbook, html };
+  }
+
+  return null;
+}
+
+function renderPreview(state) {
+  previewBox.className = 'preview-box';
+  previewBox.innerHTML = '';
+
+  if (!state) {
+    renderPreviewMessage('No preview available');
+    return;
+  }
+
+  if (state.kind === 'image') {
+    previewBox.appendChild(state.image.cloneNode());
+    return;
+  }
+
+  if (state.kind === 'pdf') {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'page-preview-list';
+    const card = document.createElement('div');
+    card.className = 'page-preview-card';
+    card.innerHTML = `<span class="muted">Page 1 of ${state.pageCount}</span>`;
+    card.appendChild(state.firstPageCanvas);
+    wrapper.appendChild(card);
+    previewBox.appendChild(wrapper);
+    return;
+  }
+
+  if (state.kind === 'docx' || state.kind === 'xlsx') {
+    const container = document.createElement('div');
+    container.className = 'preview-doc';
+    container.innerHTML = state.html;
+    previewBox.appendChild(container);
+  }
+}
+
+function renderPreviewMessage(message) {
+  previewBox.className = 'preview-box empty';
+  previewBox.textContent = message;
+}
+
+async function fileToImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
     const img = new Image();
-    const reader = new FileReader();
-
-    reader.onload = function(e) {
-        img.src = e.target.result;
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
     };
-
-    img.onload = function() {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-
-        let width = img.width;
-        let height = img.height;
-
-        if (size !== "original") {
-            width = parseInt(size);
-            height = parseInt(size);
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        let mime = "image/png";
-        if (format === "jpg" || format === "jpeg") mime = "image/jpeg";
-
-        const dataUrl = canvas.toDataURL(mime);
-
-        const link = document.getElementById("downloadLink");
-        link.href = dataUrl;
-        link.download = "converted." + format;
-        link.style.display = "block";
-        link.innerText = "Download File";
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Unsupported or corrupt image file.'));
     };
+    img.src = url;
+  });
+}
 
-    reader.readAsDataURL(file);
+async function convertImageInput(image, formats) {
+  const selectedSize = iconSize.value || 'original';
+  const files = [];
+
+  for (const format of formats) {
+    if (format === 'pdf') {
+      const pdfBlob = await imageToPdf(image);
+      files.push(makeFileResult(`${loadedFileName}.pdf`, 'PDF', pdfBlob));
+      continue;
+    }
+
+    const blob = await convertImage(image, format, selectedSize, preserveTransparency.checked);
+    const filenameSuffix = getImageSizeFilenameSuffix(selectedSize, image);
+    files.push(makeFileResult(`${loadedFileName}${filenameSuffix}.${format}`, format.toUpperCase(), blob));
+  }
+
+  return files;
+}
+
+async function convertPdfInput(file, format) {
+  const pdf = await loadPdf(file);
+
+  if (format === 'txt') {
+    const text = await extractPdfText(pdf);
+    return [makeTextResult(`${loadedFileName}.txt`, text)];
+  }
+
+  const pageBlobs = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const canvas = await renderPdfPageToCanvas(pdf, pageNumber, Number(pdfScale.value));
+    const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+    const blob = await canvasToBlob(canvas, mime, 0.92);
+    pageBlobs.push({
+      filename: `${loadedFileName}-page-${pageNumber}.${format}`,
+      label: `${format.toUpperCase()} page ${pageNumber}`,
+      blob
+    });
+  }
+
+  if (pageBlobs.length > 1 && mergePdfImages.checked) {
+    const zipBlob = await filesToZip(pageBlobs, `${loadedFileName}-${format}-pages.zip`);
+    return [makeFileResult(`${loadedFileName}-${format}-pages.zip`, 'ZIP', zipBlob, `${pageBlobs.length} exported pages`), ...pageBlobs.map((item) => makeFileResult(item.filename, item.label, item.blob))];
+  }
+
+  return pageBlobs.map((item) => makeFileResult(item.filename, item.label, item.blob));
+}
+
+async function convertDocxInput(file, format) {
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await window.mammoth.extractRawText({ arrayBuffer });
+  const rawText = (result.value || '').trim();
+
+  if (format === 'txt') {
+    return [makeTextResult(`${loadedFileName}.txt`, rawText)];
+  }
+
+  const htmlResult = await window.mammoth.convertToHtml({ arrayBuffer });
+  const html = sanitizeHtml(htmlResult.value);
+  const pdfBlob = await htmlToPdfBlob(html, `${loadedFileName}.docx`);
+  return [makeFileResult(`${loadedFileName}.pdf`, 'PDF', pdfBlob, 'Generated from DOCX content')];
+}
+
+async function convertXlsxInput(file, format) {
+  const workbook = await readWorkbook(file);
+  const firstSheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[firstSheetName];
+  const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+
+  if (format === 'csv') {
+    const csv = window.XLSX.utils.sheet_to_csv(sheet);
+    return [makeTextResult(`${loadedFileName}.csv`, csv, 'text/csv')];
+  }
+
+  if (format === 'txt') {
+    const text = rows.map((row) => row.join('\t')).join('\n');
+    return [makeTextResult(`${loadedFileName}.txt`, text)];
+  }
+
+  const pdfBlob = await workbookToPdfBlob(workbook, rows);
+  return [makeFileResult(`${loadedFileName}.pdf`, 'PDF', pdfBlob, `Sheet: ${firstSheetName}`)];
+}
+
+async function convertImage(img, format, requestedSize, keepTransparency) {
+  const size = getTargetImageSize(requestedSize, img);
+  const canvas = document.createElement('canvas');
+  canvas.width = size.width;
+  canvas.height = size.height;
+  const ctx = canvas.getContext('2d');
+
+  if (format === 'jpg' || format === 'jpeg' || !keepTransparency) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size.width, size.height);
+  }
+
+  const ratio = Math.min(size.width / img.width, size.height / img.height);
+  const drawWidth = Math.max(1, Math.round(img.width * ratio));
+  const drawHeight = Math.max(1, Math.round(img.height * ratio));
+  const dx = Math.round((size.width - drawWidth) / 2);
+  const dy = Math.round((size.height - drawHeight) / 2);
+  ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
+
+  if (format === 'ico') {
+    const pngBlob = await canvasToBlob(canvas, 'image/png');
+    const icoSize = normalizeIcoSize(requestedSize, size);
+    return pngBlobToIco(pngBlob, icoSize);
+  }
+
+  const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+  return canvasToBlob(canvas, mime, 0.92);
+}
+
+
+function getTargetImageSize(requestedSize, img) {
+  if (requestedSize === 'original') {
+    return {
+      width: img.naturalWidth || img.width,
+      height: img.naturalHeight || img.height
+    };
+  }
+
+  const numericSize = Number(requestedSize || 256);
+  return { width: numericSize, height: numericSize };
+}
+
+function getImageSizeFilenameSuffix(requestedSize, img) {
+  if (requestedSize === 'original') {
+    const width = img.naturalWidth || img.width;
+    const height = img.naturalHeight || img.height;
+    return `-original-${width}x${height}`;
+  }
+
+  return `-${requestedSize}x${requestedSize}`;
+}
+
+function normalizeIcoSize(requestedSize, actualSize) {
+  if (requestedSize === 'original') {
+    const maxDimension = Math.max(actualSize.width, actualSize.height);
+    const icoSizes = [16, 32, 48, 64, 128, 256];
+    return icoSizes.find((size) => size >= maxDimension) || 256;
+  }
+
+  return Number(requestedSize || 256);
+}
+function canvasToBlob(canvas, mime, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('Canvas export failed.'));
+    }, mime, quality);
+  });
+}
+
+async function pngBlobToIco(pngBlob, size) {
+  const pngBuffer = new Uint8Array(await pngBlob.arrayBuffer());
+  const headerSize = 6;
+  const dirEntrySize = 16;
+  const fileOffset = headerSize + dirEntrySize;
+  const totalSize = fileOffset + pngBuffer.length;
+  const buffer = new ArrayBuffer(totalSize);
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+
+  view.setUint16(0, 0, true);
+  view.setUint16(2, 1, true);
+  view.setUint16(4, 1, true);
+  bytes[6] = size >= 256 ? 0 : size;
+  bytes[7] = size >= 256 ? 0 : size;
+  bytes[8] = 0;
+  bytes[9] = 0;
+  view.setUint16(10, 1, true);
+  view.setUint16(12, 32, true);
+  view.setUint32(14, pngBuffer.length, true);
+  view.setUint32(18, fileOffset, true);
+  bytes.set(pngBuffer, fileOffset);
+
+  return new Blob([buffer], { type: 'image/x-icon' });
+}
+
+async function imageToPdf(image) {
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  const orientation = width >= height ? 'landscape' : 'portrait';
+  const pdf = new jsPDF({ orientation, unit: 'px', format: [width, height] });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!preserveTransparency.checked) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.drawImage(image, 0, 0, width, height);
+  const dataUrl = canvas.toDataURL('image/png');
+  pdf.addImage(dataUrl, 'PNG', 0, 0, width, height);
+  return pdf.output('blob');
+}
+
+async function loadPdf(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  return pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+}
+
+async function renderPdfPageToCanvas(pdf, pageNumber, scale) {
+  const page = await pdf.getPage(pageNumber);
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  await page.render({ canvasContext: context, viewport }).promise;
+  return canvas;
+}
+
+async function extractPdfText(pdf) {
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i += 1) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    const lines = textContent.items.map((item) => item.str).join(' ');
+    pages.push(`--- Page ${i} ---\n${lines}`.trim());
+  }
+  return pages.join('\n\n');
+}
+
+async function readWorkbook(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  return window.XLSX.read(arrayBuffer, { type: 'array' });
+}
+
+async function workbookToPdfBlob(workbook, rows) {
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const marginX = 36;
+  let first = true;
+
+  workbook.SheetNames.forEach((sheetName) => {
+    const sheetRows = window.XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false, defval: '' });
+    if (!first) pdf.addPage('a4', 'landscape');
+    first = false;
+
+    pdf.setFontSize(16);
+    pdf.text(sheetName, marginX, 28);
+
+    const header = (sheetRows[0] || []).map((cell) => String(cell || ''));
+    const body = (sheetRows.slice(1).length ? sheetRows.slice(1) : [[]]).map((row) => row.map((cell) => String(cell ?? '')));
+
+    pdf.autoTable({
+      startY: 40,
+      head: header.length ? [header] : [['']],
+      body,
+      margin: { left: marginX, right: marginX },
+      styles: {
+        fontSize: 8,
+        cellPadding: 5,
+        overflow: 'linebreak',
+        valign: 'middle'
+      },
+      headStyles: {
+        fillColor: [24, 35, 63],
+        textColor: [237, 242, 255]
+      },
+      tableWidth: pageWidth - marginX * 2
+    });
+  });
+
+  return pdf.output('blob');
+}
+
+async function htmlToPdfBlob(html, sourceName) {
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  const text = (container.textContent || '').replace(/\s+\n/g, '\n').trim();
+
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 40;
+  const usableWidth = pageWidth - margin * 2;
+  const lineHeight = 15;
+  let y = 56;
+
+  pdf.setFontSize(16);
+  pdf.text(sourceName, margin, 32);
+  pdf.setFontSize(11);
+
+  const blocks = text.split(/\n{2,}/).filter(Boolean);
+  for (const block of blocks) {
+    const lines = pdf.splitTextToSize(block.trim(), usableWidth);
+    for (const line of lines) {
+      if (y > pageHeight - margin) {
+        pdf.addPage();
+        y = margin;
+      }
+      pdf.text(line, margin, y);
+      y += lineHeight;
+    }
+    y += 8;
+  }
+
+  return pdf.output('blob');
+}
+
+async function filesToZip(files) {
+  const zip = new window.JSZip();
+  for (const file of files) {
+    zip.file(file.filename, file.blob);
+  }
+  return zip.generateAsync({ type: 'blob' });
+}
+
+function renderResults(files) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'result-list';
+
+  for (const file of files) {
+    const item = document.createElement('div');
+    item.className = 'result-item';
+
+    const url = URL.createObjectURL(file.blob);
+    const sizeKb = (file.blob.size / 1024).toFixed(1);
+
+    item.innerHTML = `
+      <h3>${escapeHtml(file.filename)}</h3>
+      <div class="muted">${escapeHtml(file.label)} • ${sizeKb} KB${file.note ? ` • ${escapeHtml(file.note)}` : ''}</div>
+      <div class="result-links"></div>
+    `;
+
+    const linkWrap = item.querySelector('.result-links');
+    const downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    downloadLink.download = file.filename;
+    downloadLink.textContent = 'Download';
+    linkWrap.appendChild(downloadLink);
+
+    if (file.textContent) {
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.textContent = 'Copy text';
+      copyBtn.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(file.textContent);
+        copyBtn.textContent = 'Copied';
+        setTimeout(() => { copyBtn.textContent = 'Copy text'; }, 1500);
+      });
+      linkWrap.appendChild(copyBtn);
+    }
+
+    wrapper.appendChild(item);
+  }
+
+  resultBox.innerHTML = '';
+  resultBox.appendChild(wrapper);
+}
+
+function makeFileResult(filename, label, blob, note = '') {
+  return { filename, label, blob, note };
+}
+
+function makeTextResult(filename, text, mime = 'text/plain;charset=utf-8') {
+  return {
+    filename,
+    label: filename.split('.').pop().toUpperCase(),
+    blob: new Blob([text], { type: mime }),
+    note: `${text.length.toLocaleString()} characters`,
+    textContent: text
+  };
+}
+
+function setStatus(message, isError = false) {
+  resultBox.innerHTML = `<div class="status ${isError ? 'error' : ''}">${escapeHtml(message)}</div>`;
+}
+
+function sanitizeHtml(html) {
+  return html
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/on\w+="[^"]*"/g, '');
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]));
+}
+
+function resetAll() {
+  fileInput.value = '';
+  loadedFile = null;
+  loadedType = null;
+  loadedFileName = 'file';
+  previewState = null;
+  inputType.value = 'No file selected';
+  updateOutputOptions('png');
+  renderPreviewMessage('No file loaded');
+  resultBox.innerHTML = '<p class="muted">Converted files will appear here.</p>';
 }
