@@ -203,7 +203,7 @@ function renderPreview(state) {
   }
 
   if (state.kind === 'image') {
-    previewBox.appendChild(state.image);
+    previewBox.appendChild(state.image.cloneNode());
     return;
   }
 
@@ -234,15 +234,17 @@ function renderPreviewMessage(message) {
 
 async function fileToImage(file) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Unsupported or corrupt image file.'));
-      img.src = reader.result;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
     };
-    reader.onerror = () => reject(new Error('The image file could not be read.'));
-    reader.readAsDataURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Unsupported or corrupt image file.'));
+    };
+    img.src = url;
   });
 }
 
@@ -810,9 +812,11 @@ function resetAll() {
   loadedType = null;
   loadedFileName = 'file';
   previewState = null;
+  convertBtn.disabled = false;
   inputType.value = 'No file selected';
   updateOutputOptions('png');
   syncVisibleControls('png');
   renderPreviewMessage('No file loaded');
   resultBox.innerHTML = '<p class="muted">Converted files will appear here.</p>';
+  setStatus('Ready to convert.');
 }
