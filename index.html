@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Formatify — Universal File Converter</title>
+  <meta name="description" content="Formatify is a browser-based universal file converter for images, PDF, DOCX, XLSX, and ICO files. Convert files quickly, preview them, and download one or all results in a clean workflow." />
+  <meta name="keywords" content="file converter, PDF converter, image converter, DOCX to PDF, XLSX to PDF, PNG to ICO, JPG to PDF, browser file converter, Formatify" />
+  <meta name="robots" content="index,follow" />
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon.ico" />
   <link rel="apple-touch-icon" href="favicon.ico" />
@@ -145,6 +148,16 @@
             <button id="convertBtn">Convert file</button>
             <button id="resetBtn" class="secondary" type="button">Reset</button>
           </div>
+
+          <div id="progressPanel" class="progress-panel is-hidden" aria-live="polite">
+            <div class="progress-top-row">
+              <strong id="progressLabel">Preparing conversion…</strong>
+              <span id="progressValue">0%</span>
+            </div>
+            <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div id="progressFill" class="progress-fill"></div>
+            </div>
+          </div>
         </section>
 
         <section class="card side-card">
@@ -211,6 +224,38 @@
             comments, tracked changes, or embedded objects may be simplified.
           </p>
         </section>
+      </section>
+
+      <section class="card seo-card" aria-labelledby="seoHeading">
+        <div class="section-heading compact">
+          <div>
+            <div class="section-kicker">Formatify guide</div>
+            <h2 id="seoHeading">Convert files online with a fast browser workflow</h2>
+          </div>
+        </div>
+        <div class="seo-content">
+          <p>
+            Formatify helps you convert common files directly in your browser. Use it for image conversion,
+            PDF export, DOCX to PDF or TXT, XLSX to PDF, CSV, or TXT, and quick ICO generation for app or website icons.
+          </p>
+          <h3>Popular conversions</h3>
+          <ul>
+            <li>PNG to JPG, JPEG, ICO, or PDF</li>
+            <li>JPG and JPEG to PNG, ICO, or PDF</li>
+            <li>PDF to PNG, JPG, JPEG, or TXT</li>
+            <li>DOCX to PDF or TXT</li>
+            <li>XLSX to PDF, CSV, or TXT</li>
+          </ul>
+          <h3>Why use Formatify</h3>
+          <p>
+            The app is built for a simpler experience: load a file, preview it, choose the target format, convert it,
+            then download individual results or everything at once when multiple files are generated.
+          </p>
+          <h3>FAQ</h3>
+          <p><strong>Does Formatify upload my files to a server?</strong><br>Core conversions run in the browser, which helps keep the workflow fast and simple.</p>
+          <p><strong>Can I convert multiple output files in one run?</strong><br>Yes. When a conversion creates multiple results, you can download each file individually or use Download All.</p>
+          <p><strong>What is Formatify best for?</strong><br>It is ideal for quick everyday conversions, favicon creation, image export, PDF page extraction, and light office document conversions.</p>
+        </div>
       </section>
 
       <section class="ad-strip-grid bottom-strip" id="adStripBottom"></section>
