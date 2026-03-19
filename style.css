@@ -918,3 +918,10 @@ button.secondary:hover {
     grid-column: span 1;
   }
 }
+.app-footer {
+  text-align: center;
+  padding: 18px 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  opacity: 0.7;
+}
