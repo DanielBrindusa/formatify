@@ -15,6 +15,12 @@ const resetBtn = document.getElementById('resetBtn');
 const previewBox = document.getElementById('previewBox');
 const resultBox = document.getElementById('resultBox');
 const statusBadge = document.getElementById('statusBadge');
+const progressPanel = document.getElementById('progressPanel');
+const progressLabel = document.getElementById('progressLabel');
+const progressValue = document.getElementById('progressValue');
+const progressTrack = document.getElementById('progressTrack');
+const progressFill = document.getElementById('progressFill');
+const downloadAllBtn = document.getElementById('downloadAllBtn');
 
 const adStripTop = document.getElementById('adStripTop');
 const adStripBottom = document.getElementById('adStripBottom');
@@ -31,9 +37,10 @@ const downloadAdsConfigBtn = document.getElementById('downloadAdsConfigBtn');
 
 const DEFAULT_ADS_PASSWORD = 'formatify-admin';
 const ADS_CONFIG_PATH = './ads-config.json';
-let currentAdsConfig = null;
-
 const IMAGE_TYPES = ['png', 'jpg', 'jpeg', 'ico'];
+const MAX_RENDER_BYTES = 40 * 1024 * 1024;
+const MAX_PREVIEW_BYTES = 12 * 1024 * 1024;
+
 const MATRIX = {
   png: ['png', 'jpg', 'jpeg', 'ico', 'pdf'],
   jpg: ['png', 'jpg', 'jpeg', 'ico', 'pdf'],
@@ -44,19 +51,25 @@ const MATRIX = {
   xlsx: ['pdf', 'csv', 'txt']
 };
 
+let currentAdsConfig = null;
 let loadedFile = null;
 let loadedType = null;
 let loadedFileName = 'file';
 let previewState = null;
+let activeTaskId = 0;
+let resultObjectUrls = [];
+let currentResults = [];
 
 fileInput.addEventListener('change', handleFileSelection);
 convertBtn.addEventListener('click', handleConvert);
 resetBtn.addEventListener('click', resetAll);
+pdfScale.addEventListener('change', refreshPdfPreviewIfNeeded);
 openAdsAdminBtn?.addEventListener('click', () => adsAdminDialog?.showModal());
 closeAdsAdminBtn?.addEventListener('click', () => adsAdminDialog?.close());
 unlockAdsAdminBtn?.addEventListener('click', unlockAdsEditor);
 loadAdsConfigBtn?.addEventListener('click', loadConfigIntoEditor);
 downloadAdsConfigBtn?.addEventListener('click', downloadAdsConfigFile);
+downloadAllBtn?.addEventListener('click', handleDownloadAll);
 
 await initAds();
 resetAll();
@@ -65,31 +78,59 @@ async function handleFileSelection(event) {
   const file = event.target.files?.[0];
   if (!file) return;
 
+  const taskId = startTask();
+  cleanupPreviewState();
+
   loadedFile = file;
   loadedFileName = file.name.replace(/\.[^.]+$/, '') || 'file';
   loadedType = detectFileType(file);
   inputType.value = loadedType ? loadedType.toUpperCase() : 'Unsupported';
 
   if (!loadedType || !MATRIX[loadedType]) {
-    previewState = null;
     syncVisibleControls(null);
-    setStatus('This file type is not supported.', true);
-    renderPreviewMessage('Unsupported file type');
     outputFormat.innerHTML = '';
+    renderPreviewMessage('Unsupported file type');
+    showResultInfo('This file type is not supported.');
+    setStatus('This file type is not supported.', true);
     return;
   }
 
   updateOutputOptions(loadedType);
   syncVisibleControls(loadedType);
   setStatus('Loading preview...');
+  showResultInfo(`Selected: ${file.name}`);
 
   try {
-    previewState = await buildPreviewState(file, loadedType);
+    const state = await buildPreviewState(file, loadedType, taskId);
+    if (!isTaskActive(taskId)) return;
+    previewState = state;
     renderPreview(previewState);
     setStatus('Ready to convert.');
   } catch (error) {
+    if (!isTaskActive(taskId)) return;
     console.error(error);
-    previewState = null;
+    cleanupPreviewState();
+    renderPreviewMessage('Preview could not be generated');
+    showResultInfo(error.message || 'Preview could not be generated.');
+    setStatus(`Preview failed: ${error.message}`, true);
+  }
+}
+
+async function refreshPdfPreviewIfNeeded() {
+  if (!loadedFile || loadedType !== 'pdf') return;
+  const taskId = startTask();
+  cleanupPreviewState();
+  setStatus('Refreshing PDF preview...');
+
+  try {
+    const state = await buildPreviewState(loadedFile, 'pdf', taskId);
+    if (!isTaskActive(taskId)) return;
+    previewState = state;
+    renderPreview(previewState);
+    setStatus('Ready to convert.');
+  } catch (error) {
+    if (!isTaskActive(taskId)) return;
+    console.error(error);
     renderPreviewMessage('Preview could not be generated');
     setStatus(`Preview failed: ${error.message}`, true);
   }
@@ -97,11 +138,17 @@ async function handleFileSelection(event) {
 
 async function handleConvert() {
   if (!loadedFile || !loadedType) {
+    showResultInfo('Please choose a file first.');
     setStatus('Please choose a file first.', true);
     return;
   }
 
+  const taskId = startTask();
   convertBtn.disabled = true;
+  cleanupResultUrls();
+  currentResults = [];
+  setProgress(2, 100, 'Preparing conversion...');
+  showResultInfo('Preparing conversion...');
   setStatus('Converting...');
 
   try {
@@ -111,25 +158,41 @@ async function handleConvert() {
     if (IMAGE_TYPES.includes(loadedType)) {
       const formats = downloadAllImages.checked ? ['png', 'jpg', 'jpeg', 'ico', 'pdf'] : [format];
       const image = previewState?.image || await fileToImage(loadedFile);
-      results = await convertImageInput(image, formats);
+      results = await convertImageInput(image, formats, taskId);
     } else if (loadedType === 'pdf') {
-      results = await convertPdfInput(loadedFile, format);
+      results = await convertPdfInput(loadedFile, format, taskId);
     } else if (loadedType === 'docx') {
-      results = await convertDocxInput(loadedFile, format);
+      results = await convertDocxInput(loadedFile, format, taskId);
     } else if (loadedType === 'xlsx') {
-      results = await convertXlsxInput(loadedFile, format);
+      results = await convertXlsxInput(loadedFile, format, taskId);
     } else {
       throw new Error('Unsupported conversion path.');
     }
 
+    if (!isTaskActive(taskId)) return;
     renderResults(results);
+    setProgress(100, 100, 'Conversion complete.');
     setStatus('Conversion done.');
   } catch (error) {
+    if (!isTaskActive(taskId)) return;
     console.error(error);
+    showResultError(`Conversion failed: ${error.message}`);
+    setProgress(100, 100, 'Conversion failed.');
     setStatus(`Conversion failed: ${error.message}`, true);
   } finally {
-    convertBtn.disabled = false;
+    if (isTaskActive(taskId)) {
+      convertBtn.disabled = false;
+    }
   }
+}
+
+function startTask() {
+  activeTaskId += 1;
+  return activeTaskId;
+}
+
+function isTaskActive(taskId) {
+  return taskId === activeTaskId;
 }
 
 function detectFileType(file) {
@@ -167,15 +230,30 @@ function toggleHidden(id, hidden) {
   el.classList.toggle('is-hidden', hidden);
 }
 
-async function buildPreviewState(file, type) {
+async function buildPreviewState(file, type, taskId) {
   if (IMAGE_TYPES.includes(type)) {
     return { kind: 'image', image: await fileToImage(file) };
   }
 
   if (type === 'pdf') {
     const pdf = await loadPdf(file);
-    const firstPageCanvas = await renderPdfPageToCanvas(pdf, 1, Number(pdfScale.value));
-    return { kind: 'pdf', pdf, firstPageCanvas, pageCount: pdf.numPages };
+    if (!isTaskActive(taskId)) {
+      await safeDestroyPdf(pdf);
+      throw new Error('Preview cancelled.');
+    }
+
+    const previewScale = clampPdfScaleForMemory(await getPdfPageDimensions(pdf, 1), Math.min(Number(pdfScale.value || 1), 1.2), MAX_PREVIEW_BYTES);
+    const firstPageCanvas = await renderPdfPageToCanvas(pdf, 1, previewScale);
+    const pageCount = pdf.numPages;
+    await safeDestroyPdf(pdf);
+
+    return {
+      kind: 'pdf',
+      firstPageCanvas,
+      pageCount,
+      previewScale,
+      note: previewScale < Number(pdfScale.value || 1) ? 'Preview scale was reduced for performance.' : ''
+    };
   }
 
   if (type === 'docx') {
@@ -188,7 +266,7 @@ async function buildPreviewState(file, type) {
     const workbook = await readWorkbook(file);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const html = window.XLSX.utils.sheet_to_html(sheet);
-    return { kind: 'xlsx', workbook, html };
+    return { kind: 'xlsx', html };
   }
 
   return null;
@@ -211,9 +289,15 @@ function renderPreview(state) {
   if (state.kind === 'pdf') {
     const wrapper = document.createElement('div');
     wrapper.className = 'page-preview-list';
+
     const card = document.createElement('div');
     card.className = 'page-preview-card';
-    card.innerHTML = `<span class="muted">Page 1 of ${state.pageCount}</span>`;
+
+    const meta = document.createElement('div');
+    meta.className = 'preview-meta';
+    meta.innerHTML = `<span class="muted">Page 1 of ${state.pageCount}</span>${state.note ? `<span class="muted">${escapeHtml(state.note)}</span>` : ''}`;
+
+    card.appendChild(meta);
     card.appendChild(state.firstPageCanvas);
     wrapper.appendChild(card);
     previewBox.appendChild(wrapper);
@@ -249,54 +333,79 @@ async function fileToImage(file) {
   });
 }
 
-async function convertImageInput(image, formats) {
+async function convertImageInput(image, formats, taskId) {
   const selectedSize = iconSize.value || 'original';
   const files = [];
 
-  for (const format of formats) {
+  for (let index = 0; index < formats.length; index += 1) {
+    assertTaskActive(taskId);
+    const format = formats[index];
+    setProgress(index, formats.length, `Converting ${format.toUpperCase()} (${index + 1}/${formats.length})...`);
+
     if (format === 'pdf') {
       const pdfBlob = await imageToPdf(image);
       files.push(makeFileResult(`${loadedFileName}.pdf`, 'PDF', pdfBlob));
-      continue;
+    } else {
+      const blob = await convertImage(image, format, selectedSize, preserveTransparency.checked);
+      const filenameSuffix = getImageSizeFilenameSuffix(selectedSize, image);
+      files.push(makeFileResult(`${loadedFileName}${filenameSuffix}.${format}`, format.toUpperCase(), blob));
     }
 
-    const blob = await convertImage(image, format, selectedSize, preserveTransparency.checked);
-    const filenameSuffix = getImageSizeFilenameSuffix(selectedSize, image);
-    files.push(makeFileResult(`${loadedFileName}${filenameSuffix}.${format}`, format.toUpperCase(), blob));
+    await yieldToBrowser();
   }
 
   return files;
 }
 
-async function convertPdfInput(file, format) {
+async function convertPdfInput(file, format, taskId) {
   const pdf = await loadPdf(file);
 
-  if (format === 'txt') {
-    const text = await extractPdfText(pdf);
-    return [makeTextResult(`${loadedFileName}.txt`, text)];
-  }
+  try {
+    if (format === 'txt') {
+      setProgress(10, 100, 'Extracting text from PDF...', true);
+      const text = await extractPdfText(pdf, taskId);
+      return [makeTextResult(`${loadedFileName}.txt`, text)];
+    }
 
-  const pageBlobs = [];
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const canvas = await renderPdfPageToCanvas(pdf, pageNumber, Number(pdfScale.value));
-    const mime = format === 'png' ? 'image/png' : 'image/jpeg';
-    const blob = await canvasToBlob(canvas, mime, 0.92);
-    pageBlobs.push({
-      filename: `${loadedFileName}-page-${pageNumber}.${format}`,
-      label: `${format.toUpperCase()} page ${pageNumber}`,
-      blob
-    });
-  }
+    const pageBlobs = [];
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      assertTaskActive(taskId);
+      setProgress(pageNumber - 1, pdf.numPages, `Rendering PDF page ${pageNumber} of ${pdf.numPages}...`);
+      const pageInfo = await getPdfPageDimensions(pdf, pageNumber);
+      const requestedScale = Number(pdfScale.value || 1);
+      const safeScale = clampPdfScaleForMemory(pageInfo, requestedScale, MAX_RENDER_BYTES);
+      const canvas = await renderPdfPageToCanvas(pdf, pageNumber, safeScale);
+      const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+      const blob = await canvasToBlob(canvas, mime, 0.92);
+      releaseCanvas(canvas);
 
-  if (pageBlobs.length > 1 && mergePdfImages.checked) {
-    const zipBlob = await filesToZip(pageBlobs, `${loadedFileName}-${format}-pages.zip`);
-    return [makeFileResult(`${loadedFileName}-${format}-pages.zip`, 'ZIP', zipBlob, `${pageBlobs.length} exported pages`), ...pageBlobs.map((item) => makeFileResult(item.filename, item.label, item.blob))];
-  }
+      pageBlobs.push({
+        filename: `${loadedFileName}-page-${pageNumber}.${format}`,
+        label: `${format.toUpperCase()} page ${pageNumber}`,
+        blob,
+        note: safeScale < requestedScale ? `Scaled to ${safeScale.toFixed(2)}× to stay memory-safe.` : ''
+      });
 
-  return pageBlobs.map((item) => makeFileResult(item.filename, item.label, item.blob));
+      await yieldToBrowser();
+    }
+
+    if (pageBlobs.length > 1 && mergePdfImages.checked) {
+      setProgress(pdf.numPages, pdf.numPages, 'Packaging ZIP file...', true);
+      const zipBlob = await filesToZip(pageBlobs);
+      return [
+        makeFileResult(`${loadedFileName}-${format}-pages.zip`, 'ZIP', zipBlob, `${pageBlobs.length} exported pages`),
+        ...pageBlobs.map((item) => makeFileResult(item.filename, item.label, item.blob, item.note))
+      ];
+    }
+
+    return pageBlobs.map((item) => makeFileResult(item.filename, item.label, item.blob, item.note));
+  } finally {
+    await safeDestroyPdf(pdf);
+  }
 }
 
 async function convertDocxInput(file, format) {
+  setProgress(20, 100, 'Reading DOCX content...', true);
   const arrayBuffer = await file.arrayBuffer();
   const result = await window.mammoth.extractRawText({ arrayBuffer });
   const rawText = (result.value || '').trim();
@@ -305,6 +414,7 @@ async function convertDocxInput(file, format) {
     return [makeTextResult(`${loadedFileName}.txt`, rawText)];
   }
 
+  setProgress(75, 100, 'Building PDF from DOCX...', true);
   const htmlResult = await window.mammoth.convertToHtml({ arrayBuffer });
   const html = sanitizeHtml(htmlResult.value);
   const pdfBlob = await htmlToPdfBlob(html, `${loadedFileName}.docx`);
@@ -312,6 +422,7 @@ async function convertDocxInput(file, format) {
 }
 
 async function convertXlsxInput(file, format) {
+  setProgress(18, 100, 'Reading workbook...', true);
   const workbook = await readWorkbook(file);
   const firstSheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[firstSheetName];
@@ -327,7 +438,8 @@ async function convertXlsxInput(file, format) {
     return [makeTextResult(`${loadedFileName}.txt`, text)];
   }
 
-  const pdfBlob = await workbookToPdfBlob(workbook, rows);
+  setProgress(76, 100, 'Building PDF from workbook...', true);
+  const pdfBlob = await workbookToPdfBlob(workbook);
   return [makeFileResult(`${loadedFileName}.pdf`, 'PDF', pdfBlob, `Sheet: ${firstSheetName}`)];
 }
 
@@ -336,7 +448,7 @@ async function convertImage(img, format, requestedSize, keepTransparency) {
   const canvas = document.createElement('canvas');
   canvas.width = size.width;
   canvas.height = size.height;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: false });
 
   if (format === 'jpg' || format === 'jpeg' || !keepTransparency) {
     ctx.fillStyle = '#ffffff';
@@ -352,14 +464,16 @@ async function convertImage(img, format, requestedSize, keepTransparency) {
 
   if (format === 'ico') {
     const pngBlob = await canvasToBlob(canvas, 'image/png');
+    releaseCanvas(canvas);
     const icoSize = normalizeIcoSize(requestedSize, size);
     return pngBlobToIco(pngBlob, icoSize);
   }
 
   const mime = format === 'png' ? 'image/png' : 'image/jpeg';
-  return canvasToBlob(canvas, mime, 0.92);
+  const blob = await canvasToBlob(canvas, mime, 0.92);
+  releaseCanvas(canvas);
+  return blob;
 }
-
 
 function getTargetImageSize(requestedSize, img) {
   if (requestedSize === 'original') {
@@ -392,6 +506,7 @@ function normalizeIcoSize(requestedSize, actualSize) {
 
   return Number(requestedSize || 256);
 }
+
 function canvasToBlob(canvas, mime, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -443,6 +558,8 @@ async function imageToPdf(image) {
   }
   ctx.drawImage(image, 0, 0, width, height);
   const dataUrl = canvas.toDataURL('image/png');
+  releaseCanvas(canvas);
+
   pdf.addImage(dataUrl, 'PNG', 0, 0, width, height);
   return pdf.output('blob');
 }
@@ -452,24 +569,45 @@ async function loadPdf(file) {
   return pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 }
 
+async function getPdfPageDimensions(pdf, pageNumber) {
+  const page = await pdf.getPage(pageNumber);
+  const viewport = page.getViewport({ scale: 1 });
+  const info = { width: viewport.width, height: viewport.height };
+  page.cleanup();
+  return info;
+}
+
+function clampPdfScaleForMemory(pageInfo, requestedScale, maxBytes) {
+  const safeRequestedScale = Number.isFinite(requestedScale) && requestedScale > 0 ? requestedScale : 1;
+  const baseBytes = pageInfo.width * pageInfo.height * 4;
+  if (!baseBytes) return safeRequestedScale;
+  const maxScale = Math.sqrt(maxBytes / baseBytes);
+  return Math.max(0.5, Math.min(safeRequestedScale, maxScale));
+}
+
 async function renderPdfPageToCanvas(pdf, pageNumber, scale) {
   const page = await pdf.getPage(pageNumber);
   const viewport = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext('2d', { alpha: false });
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);
   await page.render({ canvasContext: context, viewport }).promise;
+  page.cleanup();
   return canvas;
 }
 
-async function extractPdfText(pdf) {
+async function extractPdfText(pdf, taskId) {
   const pages = [];
   for (let i = 1; i <= pdf.numPages; i += 1) {
+    assertTaskActive(taskId);
+    setProgress(i - 1, pdf.numPages, `Reading PDF text ${i}/${pdf.numPages}...`);
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
     const lines = textContent.items.map((item) => item.str).join(' ');
     pages.push(`--- Page ${i} ---\n${lines}`.trim());
+    page.cleanup();
+    await yieldToBrowser();
   }
   return pages.join('\n\n');
 }
@@ -479,7 +617,7 @@ async function readWorkbook(file) {
   return window.XLSX.read(arrayBuffer, { type: 'array' });
 }
 
-async function workbookToPdfBlob(workbook, rows) {
+async function workbookToPdfBlob(workbook) {
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const marginX = 36;
@@ -557,10 +695,14 @@ async function filesToZip(files) {
   for (const file of files) {
     zip.file(file.filename, file.blob);
   }
-  return zip.generateAsync({ type: 'blob' });
+  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
 }
 
 function renderResults(files) {
+  cleanupResultUrls();
+  currentResults = Array.isArray(files) ? [...files] : [];
+  toggleDownloadAllButton();
+
   const wrapper = document.createElement('div');
   wrapper.className = 'result-list';
 
@@ -569,11 +711,12 @@ function renderResults(files) {
     item.className = 'result-item';
 
     const url = URL.createObjectURL(file.blob);
-    const sizeKb = (file.blob.size / 1024).toFixed(1);
+    resultObjectUrls.push(url);
+    const sizeLabel = formatBytes(file.blob.size);
 
     item.innerHTML = `
       <h3>${escapeHtml(file.filename)}</h3>
-      <div class="muted">${escapeHtml(file.label)} • ${sizeKb} KB${file.note ? ` • ${escapeHtml(file.note)}` : ''}</div>
+      <div class="muted">${escapeHtml(file.label)} • ${escapeHtml(sizeLabel)}${file.note ? ` • ${escapeHtml(file.note)}` : ''}</div>
       <div class="result-links"></div>
     `;
 
@@ -618,10 +761,6 @@ function makeTextResult(filename, text, mime = 'text/plain;charset=utf-8') {
 }
 
 function setStatus(message, isError = false) {
-  if (isError || /converting|loading|choose a file|unsupported/i.test(message)) {
-    resultBox.innerHTML = `<div class="status ${isError ? 'error' : ''}">${escapeHtml(message)}</div>`;
-  }
-
   if (!statusBadge) return;
   statusBadge.textContent = message;
   statusBadge.className = 'status-badge';
@@ -631,7 +770,7 @@ function setStatus(message, isError = false) {
     return;
   }
 
-  if (/converting/i.test(message) || /loading/i.test(message)) {
+  if (/converting|loading|refreshing|reading|packaging/i.test(message)) {
     statusBadge.classList.add('busy');
   } else if (/ready/i.test(message)) {
     statusBadge.classList.add('ready');
@@ -640,6 +779,32 @@ function setStatus(message, isError = false) {
   } else {
     statusBadge.classList.add('idle');
   }
+}
+
+function setProgress(current, total, message, indeterminate = false) {
+  const safeTotal = Math.max(1, Number(total) || 1);
+  const safeCurrent = Math.max(0, Number(current) || 0);
+  const percent = indeterminate ? Math.max(5, Math.min(95, Math.round((safeCurrent / safeTotal) * 100) || 0)) : Math.max(0, Math.min(100, Math.round((safeCurrent / safeTotal) * 100)));
+
+  if (progressLabel) progressLabel.textContent = message;
+  if (progressValue) progressValue.textContent = `${percent}%`;
+  if (progressFill) progressFill.style.width = `${percent}%`;
+  if (progressTrack) {
+    progressTrack.classList.toggle('indeterminate', indeterminate);
+    progressTrack.setAttribute('aria-valuenow', String(percent));
+  }
+}
+
+function showProgress(message) {
+  setProgress(0, 100, message, true);
+}
+
+function showResultInfo(message) {
+  resultBox.innerHTML = `<div class="status">${escapeHtml(message)}</div>`;
+}
+
+function showResultError(message) {
+  resultBox.innerHTML = `<div class="status error">${escapeHtml(message)}</div>`;
 }
 
 function sanitizeHtml(html) {
@@ -658,6 +823,87 @@ function escapeHtml(value) {
   }[char]));
 }
 
+function releaseCanvas(canvas) {
+  if (!canvas) return;
+  const context = canvas.getContext('2d');
+  if (context) context.clearRect(0, 0, canvas.width, canvas.height);
+  canvas.width = 1;
+  canvas.height = 1;
+}
+
+function cleanupPreviewState() {
+  if (previewState?.firstPageCanvas) {
+    releaseCanvas(previewState.firstPageCanvas);
+  }
+  previewState = null;
+}
+
+function cleanupResultUrls() {
+  resultObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+  resultObjectUrls = [];
+}
+
+function toggleDownloadAllButton() {
+  if (!downloadAllBtn) return;
+  downloadAllBtn.disabled = !currentResults.length;
+}
+
+async function handleDownloadAll() {
+  if (!currentResults.length) return;
+
+  downloadAllBtn.disabled = true;
+  const originalText = downloadAllBtn.textContent;
+  downloadAllBtn.textContent = 'Preparing ZIP...';
+
+  try {
+    const zipBlob = await filesToZip(currentResults);
+    const zipName = `${loadedFileName || 'formatify'}-all-results.zip`;
+    const url = URL.createObjectURL(zipBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = zipName;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus('All result files downloaded.');
+  } catch (error) {
+    console.error(error);
+    setStatus(`Download All failed: ${error.message}`, true);
+  } finally {
+    downloadAllBtn.textContent = originalText;
+    toggleDownloadAllButton();
+  }
+}
+
+function assertTaskActive(taskId) {
+  if (!isTaskActive(taskId)) {
+    throw new Error('Operation cancelled.');
+  }
+}
+
+async function yieldToBrowser() {
+  await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+}
+
+async function safeDestroyPdf(pdf) {
+  if (!pdf) return;
+  try {
+    await pdf.destroy();
+  } catch (error) {
+    console.warn('PDF cleanup warning:', error);
+  }
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let index = 0;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  return `${value.toFixed(value >= 100 || index === 0 ? 0 : 1)} ${units[index]}`;
+}
 
 async function initAds() {
   try {
@@ -808,16 +1054,21 @@ function downloadAdsConfigFile() {
 }
 
 function resetAll() {
+  startTask();
+  cleanupPreviewState();
+  cleanupResultUrls();
   fileInput.value = '';
+  currentResults = [];
+  toggleDownloadAllButton();
   loadedFile = null;
   loadedType = null;
   loadedFileName = 'file';
-  previewState = null;
   convertBtn.disabled = false;
   inputType.value = 'No file selected';
   updateOutputOptions('png');
   syncVisibleControls('png');
   renderPreviewMessage('No file loaded');
   resultBox.innerHTML = '<p class="muted">Converted files will appear here.</p>';
-  setStatus('Ready to convert.');
+  setProgress(0, 100, 'Waiting for conversion...');
+  setStatus('Waiting for file');
 }
