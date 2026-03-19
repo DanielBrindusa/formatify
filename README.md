@@ -116,7 +116,7 @@ designed to:
 
 ``` html
 <iframe 
-  src="https://your-domain.com/formatify/index.html"
+  src="https://danielbrindusa.github.io/formatify/"
   width="100%" 
   height="900px"
   style="border:none;">
