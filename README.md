@@ -50,11 +50,3 @@ DOCX to PDF and XLSX to PDF are generated in the browser using JavaScript librar
 
 ## Recommendation
 For best browser compatibility, use a current Chrome, Edge, or Firefox version.
-
-
-## Recent stability and performance updates
-- fixed status handling so reset/preview/conversion states do not overwrite each other incorrectly
-- removed artificial file size gating in the app flow; conversions now rely on browser capacity instead of a hard UI cap
-- added memory-safe PDF rendering with automatic scale clamping to keep single-page canvas usage around a 40 MB ceiling
-- added explicit cleanup for canvases, object URLs, and PDF documents to reduce memory leaks during repeated use
-- improved PDF UX by using a lighter preview path and yielding between long conversion steps so the interface stays responsive

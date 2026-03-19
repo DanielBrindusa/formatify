@@ -4,8 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Formatify — Universal File Converter</title>
-  <meta name="description" content="Formatify is a browser-based file converter for PDF, DOCX, XLSX, PNG, JPG, JPEG, and ICO files. Convert files online in your browser with previews, fast downloads, and privacy-friendly client-side processing." />
-  <meta name="keywords" content="file converter, PDF converter, DOCX to PDF, XLSX to PDF, PDF to JPG, PDF to PNG, image converter, ICO converter, browser file converter, client-side converter" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -144,16 +145,6 @@
             <button id="convertBtn">Convert file</button>
             <button id="resetBtn" class="secondary" type="button">Reset</button>
           </div>
-
-          <div class="progress-panel" id="progressPanel" aria-live="polite">
-            <div class="progress-meta">
-              <span id="progressLabel">Waiting for conversion...</span>
-              <span id="progressValue">0%</span>
-            </div>
-            <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressTrack">
-              <div class="progress-fill" id="progressFill"></div>
-            </div>
-          </div>
         </section>
 
         <section class="card side-card">
@@ -174,7 +165,6 @@
               <div class="section-kicker">Step 3</div>
               <h2>Results</h2>
             </div>
-            <button id="downloadAllBtn" class="secondary" type="button" disabled>Download All</button>
           </div>
           <div id="resultBox" class="result-box">
             <p class="muted">Converted files will appear here.</p>
@@ -224,50 +214,6 @@
       </section>
 
       <section class="ad-strip-grid bottom-strip" id="adStripBottom"></section>
-
-      <section class="card seo-card">
-        <div class="section-heading compact">
-          <div>
-            <div class="section-kicker">More about Formatify</div>
-            <h2>Free online file converter for everyday formats</h2>
-          </div>
-        </div>
-
-        <div class="seo-grid">
-          <article class="seo-block">
-            <h3>Convert files directly in your browser</h3>
-            <p>Formatify is designed for people who need a simple way to convert files without installing heavy desktop software. You can work with PDF, DOCX, XLSX, PNG, JPG, JPEG, and ICO files in a cleaner browser workflow with file preview, quick output selection, and direct download links.</p>
-          </article>
-
-          <article class="seo-block">
-            <h3>Popular conversions supported</h3>
-            <p>Use Formatify for common tasks such as DOCX to PDF, XLSX to PDF, PDF to PNG, PDF to JPG, PDF to JPEG, PDF to TXT, PNG to ICO, JPG to PDF, JPEG to PNG, and more. It is especially helpful for quick format changes, lightweight document exports, and image preparation for websites, apps, and icons.</p>
-          </article>
-
-          <article class="seo-block">
-            <h3>Privacy-friendly client-side processing</h3>
-            <p>Most of the conversion work happens in the browser, which helps keep the experience fast and privacy-friendly. That makes Formatify useful for users who prefer a client-side file converter instead of sending files through a traditional upload-based online service.</p>
-          </article>
-
-          <article class="seo-block faq-block">
-            <h3>Quick answers</h3>
-            <div class="faq-list">
-              <details>
-                <summary>Can I convert PDF files into images?</summary>
-                <p>Yes. Formatify supports PDF to PNG, PDF to JPG, and PDF to JPEG, with page-by-page export handling for multi-page files.</p>
-              </details>
-              <details>
-                <summary>Can I turn Office files into PDF?</summary>
-                <p>Yes. You can convert DOCX to PDF and XLSX to PDF directly in the app, plus export text or CSV where supported.</p>
-              </details>
-              <details>
-                <summary>Can I create icon files?</summary>
-                <p>Yes. Image files such as PNG, JPG, and JPEG can be converted into ICO format, which is useful for favicons, app icons, and shortcuts.</p>
-              </details>
-            </div>
-          </article>
-        </div>
-      </section>
     </main>
   </div>
 
