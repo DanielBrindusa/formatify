@@ -1,60 +1,164 @@
-# Universal File Converter "Formatify"
+# 🚀 Formatify --- Universal File Converter
 
-A browser-based converter you can upload directly to GitHub and publish with GitHub Pages.
+A modern, browser-based file converter that runs **entirely
+client-side**, supporting images, PDFs, and Office files --- with a
+clean UI, preview system, and flexible output options.
 
-## Supported conversions
+------------------------------------------------------------------------
 
-### Images and icons
-- PNG -> JPG / JPEG / ICO / PDF
-- JPG -> PNG / JPEG / ICO / PDF
-- JPEG -> PNG / JPG / ICO / PDF
-- ICO -> PNG / JPG / JPEG / ICO / PDF
+## ✨ Overview
 
-### PDF
-- PDF -> PNG / JPG / JPEG
-- PDF -> TXT
-- PNG / JPG / JPEG / ICO -> PDF
+Formatify is a **privacy-friendly, front-end-only file converter**
+designed to:
 
-### Office files
-- DOCX -> PDF
-- DOCX -> TXT
-- XLSX -> PDF
-- XLSX -> CSV
-- XLSX -> TXT
+-   Convert files instantly in the browser\
+-   Avoid server uploads (everything stays local)\
+-   Provide a clean, guided UX (Step 1 → Step 3 flow)\
+-   Support multiple formats including **PDF, DOCX, XLSX, PNG, JPG,
+    ICO**
 
-## Important note
-DOCX to PDF and XLSX to PDF are generated in the browser using JavaScript libraries. That means:
-- simple documents and tables work well
-- advanced layout, tracked changes, charts, comments, formulas, embedded objects, or exact Microsoft Office rendering may be simplified
+------------------------------------------------------------------------
 
-## Files
-- `index.html`
-- `style.css`
-- `script.js`
+## 🔥 Key Features
 
-## Libraries used from CDN
-- PDF.js
-- jsPDF
-- JSZip
-- Mammoth.js
-- SheetJS (XLSX)
-- jsPDF AutoTable
+### ⚡ Client-side processing
 
-## How to publish on GitHub Pages
-1. Create a GitHub repository.
-2. Upload `index.html`, `style.css`, and `script.js`.
-3. Go to repository **Settings** -> **Pages**.
-4. Under **Build and deployment**, choose **Deploy from a branch**.
-5. Select your main branch and `/root`.
-6. Save and open the generated GitHub Pages link.
+-   No backend required\
+-   No file uploads\
+-   Faster and more secure
 
-## Recommendation
-For best browser compatibility, use a current Chrome, Edge, or Firefox version.
+### 🧠 Smart conversion system
 
+-   Output formats adapt dynamically based on input\
+-   Built-in conversion matrix
 
-## Recent stability and performance updates
-- fixed status handling so reset/preview/conversion states do not overwrite each other incorrectly
-- removed artificial file size gating in the app flow; conversions now rely on browser capacity instead of a hard UI cap
-- added memory-safe PDF rendering with automatic scale clamping to keep single-page canvas usage around a 40 MB ceiling
-- added explicit cleanup for canvases, object URLs, and PDF documents to reduce memory leaks during repeated use
-- improved PDF UX by using a lighter preview path and yielding between long conversion steps so the interface stays responsive
+### 🖼️ File preview
+
+-   Image preview\
+-   PDF first-page rendering\
+-   DOCX & XLSX HTML preview
+
+### 📦 Batch & advanced options
+
+-   Convert to multiple formats at once\
+-   Download all results as ZIP\
+-   Preserve transparency\
+-   Choose output size\
+-   Adjust PDF render quality
+
+### 📊 Progress & status feedback
+
+-   Live progress bar\
+-   Conversion states (idle / busy / success / error)
+
+### 🎯 Built-in monetization system
+
+-   Configurable ad slots via JSON\
+-   Admin panel (password protected)
+
+------------------------------------------------------------------------
+
+## 📁 Project Structure
+
+    /project-root
+    │
+    ├── index.html
+    ├── style.css
+    ├── script.js
+    ├── formatify.png
+    ├── favicon.ico
+    ├── ads-config.json
+    └── README.md
+
+------------------------------------------------------------------------
+
+## 🔄 Supported Conversions
+
+### 🖼️ Images & Icons
+
+-   PNG ⇄ JPG / JPEG / ICO / PDF\
+-   JPG / JPEG ⇄ PNG / ICO / PDF\
+-   ICO → PNG / JPG / JPEG / PDF
+
+### 📄 PDF
+
+-   PDF → PNG / JPG / JPEG\
+-   PDF → TXT\
+-   Images → PDF
+
+### 📊 Office Files
+
+-   DOCX → PDF / TXT\
+-   XLSX → PDF / CSV / TXT
+
+------------------------------------------------------------------------
+
+## ⚠️ Limitations
+
+-   DOCX/XLSX → PDF is not identical to Microsoft Office rendering\
+-   Complex layouts may be simplified
+
+------------------------------------------------------------------------
+
+## ▶️ How to Use
+
+1.  Upload a file\
+2.  Select output format\
+3.  Configure options\
+4.  Click Convert\
+5.  Download results
+
+------------------------------------------------------------------------
+
+## 🌐 Embed in Your Website
+
+### Option 1 --- iframe
+
+``` html
+<iframe 
+  src="https://your-domain.com/formatify/index.html"
+  width="100%" 
+  height="900px"
+  style="border:none;">
+</iframe>
+```
+
+### Option 2 --- Full integration
+
+``` html
+<link rel="stylesheet" href="/formatify/style.css">
+<script src="/formatify/script.js" defer></script>
+```
+
+------------------------------------------------------------------------
+
+## 🎨 Customization
+
+Edit CSS variables:
+
+``` css
+:root {
+  --accent: #ff9b71;
+}
+```
+
+------------------------------------------------------------------------
+
+## 💰 Ad System
+
+Configured via `ads-config.json`
+
+Default password: formatify-admin
+
+------------------------------------------------------------------------
+
+## 🔒 Privacy
+
+-   100% client-side\
+-   No uploads
+
+------------------------------------------------------------------------
+
+## 🧾 License
+
+Free to use and modify.
