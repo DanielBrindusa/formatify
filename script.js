@@ -1,3 +1,10 @@
+/*
+Copyright (c) 2026 Daniel Cristian Brindusa
+
+This software is proprietary and confidential.
+Unauthorized copying, modification, or distribution is prohibited.
+*/
+
 const { jsPDF } = window.jspdf;
 const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.min.mjs');
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.mjs';
