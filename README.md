@@ -426,7 +426,6 @@ Apple Style (Clean + soft)
 ```
 
 Neon / Cyber
-Perfect for standout SaaS or landing pages
 ``` CSS
 :root {
   --bg: #0b0014;
