@@ -1,4 +1,4 @@
-# Universal File Converter for GitHub Pages
+# Universal File Converter "Formatify"
 
 A browser-based converter you can upload directly to GitHub and publish with GitHub Pages.
 
