@@ -467,6 +467,14 @@ button.secondary {
   padding: 12px;
 }
 
+.preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
 .result-list {
   display: flex;
   flex-direction: column;
