@@ -161,4 +161,4 @@ Default password: formatify-admin
 
 ## License
 
-Free to use and modify.
+License: Proprietary – All rights reserved
