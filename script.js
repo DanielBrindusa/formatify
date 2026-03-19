@@ -15,10 +15,6 @@ const resetBtn = document.getElementById('resetBtn');
 const previewBox = document.getElementById('previewBox');
 const resultBox = document.getElementById('resultBox');
 const statusBadge = document.getElementById('statusBadge');
-const progressPanel = document.getElementById('progressPanel');
-const progressFill = document.getElementById('progressFill');
-const progressLabel = document.getElementById('progressLabel');
-const progressValue = document.getElementById('progressValue');
 
 const adStripTop = document.getElementById('adStripTop');
 const adStripBottom = document.getElementById('adStripBottom');
@@ -52,8 +48,6 @@ let loadedFile = null;
 let loadedType = null;
 let loadedFileName = 'file';
 let previewState = null;
-let currentResultUrls = [];
-let lastResults = [];
 
 fileInput.addEventListener('change', handleFileSelection);
 convertBtn.addEventListener('click', handleConvert);
@@ -63,28 +57,6 @@ closeAdsAdminBtn?.addEventListener('click', () => adsAdminDialog?.close());
 unlockAdsAdminBtn?.addEventListener('click', unlockAdsEditor);
 loadAdsConfigBtn?.addEventListener('click', loadConfigIntoEditor);
 downloadAdsConfigBtn?.addEventListener('click', downloadAdsConfigFile);
-
-
-function clearResultUrls() {
-  for (const url of currentResultUrls) {
-    try { URL.revokeObjectURL(url); } catch {}
-  }
-  currentResultUrls = [];
-}
-
-function setProgress(percent = 0, label = '') {
-  const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
-  if (progressPanel) progressPanel.classList.remove('is-hidden');
-  if (progressFill) progressFill.style.width = `${safePercent}%`;
-  const track = progressPanel?.querySelector('.progress-track');
-  if (track) track.setAttribute('aria-valuenow', String(Math.round(safePercent)));
-  if (progressValue) progressValue.textContent = `${Math.round(safePercent)}%`;
-  if (label && progressLabel) progressLabel.textContent = label;
-}
-
-function hideProgress() {
-  progressPanel?.classList.add('is-hidden');
-}
 
 await initAds();
 resetAll();
@@ -107,10 +79,6 @@ async function handleFileSelection(event) {
     return;
   }
 
-  clearResultUrls();
-  lastResults = [];
-  resultBox.innerHTML = '<p class="muted">Converted files will appear here.</p>';
-  hideProgress();
   updateOutputOptions(loadedType);
   syncVisibleControls(loadedType);
   setStatus('Loading preview...');
@@ -134,9 +102,6 @@ async function handleConvert() {
   }
 
   convertBtn.disabled = true;
-  clearResultUrls();
-  lastResults = [];
-  setProgress(4, 'Preparing conversion...');
   setStatus('Converting...');
 
   try {
@@ -145,31 +110,22 @@ async function handleConvert() {
 
     if (IMAGE_TYPES.includes(loadedType)) {
       const formats = downloadAllImages.checked ? ['png', 'jpg', 'jpeg', 'ico', 'pdf'] : [format];
-      setProgress(15, 'Loading image...');
       const image = previewState?.image || await fileToImage(loadedFile);
-      setProgress(30, 'Converting image...');
       results = await convertImageInput(image, formats);
     } else if (loadedType === 'pdf') {
-      setProgress(12, 'Opening PDF...');
       results = await convertPdfInput(loadedFile, format);
     } else if (loadedType === 'docx') {
-      setProgress(18, 'Reading DOCX...');
       results = await convertDocxInput(loadedFile, format);
     } else if (loadedType === 'xlsx') {
-      setProgress(18, 'Reading spreadsheet...');
       results = await convertXlsxInput(loadedFile, format);
     } else {
       throw new Error('Unsupported conversion path.');
     }
 
-    setProgress(92, 'Preparing downloads...');
-    lastResults = results;
     renderResults(results);
-    setProgress(100, 'Conversion complete.');
     setStatus('Conversion done.');
   } catch (error) {
     console.error(error);
-    setProgress(100, 'Conversion failed.');
     setStatus(`Conversion failed: ${error.message}`, true);
   } finally {
     convertBtn.disabled = false;
@@ -322,7 +278,6 @@ async function convertPdfInput(file, format) {
 
   const pageBlobs = [];
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    setProgress(15 + ((pageNumber - 1) / Math.max(pdf.numPages, 1)) * 70, `Rendering PDF page ${pageNumber} of ${pdf.numPages}...`);
     const canvas = await renderPdfPageToCanvas(pdf, pageNumber, Number(pdfScale.value));
     const mime = format === 'png' ? 'image/png' : 'image/jpeg';
     const blob = await canvasToBlob(canvas, mime, 0.92);
@@ -606,42 +561,6 @@ async function filesToZip(files) {
 }
 
 function renderResults(files) {
-  clearResultUrls();
-  const fragment = document.createDocumentFragment();
-
-  if (files.length > 1) {
-    const toolbar = document.createElement('div');
-    toolbar.className = 'result-toolbar';
-    const downloadAllBtn = document.createElement('button');
-    downloadAllBtn.type = 'button';
-    downloadAllBtn.textContent = 'Download All';
-    downloadAllBtn.addEventListener('click', async () => {
-      downloadAllBtn.disabled = true;
-      const originalText = downloadAllBtn.textContent;
-      try {
-        downloadAllBtn.textContent = 'Preparing ZIP...';
-        const zipBlob = await filesToZip(files);
-        const zipUrl = URL.createObjectURL(zipBlob);
-        currentResultUrls.push(zipUrl);
-        const link = document.createElement('a');
-        link.href = zipUrl;
-        link.download = `${loadedFileName}-all-results.zip`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setStatus('All files ready for download.');
-      } catch (error) {
-        console.error(error);
-        setStatus(`Download All failed: ${error.message}`, true);
-      } finally {
-        downloadAllBtn.disabled = false;
-        downloadAllBtn.textContent = originalText;
-      }
-    });
-    toolbar.appendChild(downloadAllBtn);
-    fragment.appendChild(toolbar);
-  }
-
   const wrapper = document.createElement('div');
   wrapper.className = 'result-list';
 
@@ -650,7 +569,6 @@ function renderResults(files) {
     item.className = 'result-item';
 
     const url = URL.createObjectURL(file.blob);
-    currentResultUrls.push(url);
     const sizeKb = (file.blob.size / 1024).toFixed(1);
 
     item.innerHTML = `
@@ -681,9 +599,8 @@ function renderResults(files) {
     wrapper.appendChild(item);
   }
 
-  fragment.appendChild(wrapper);
   resultBox.innerHTML = '';
-  resultBox.appendChild(fragment);
+  resultBox.appendChild(wrapper);
 }
 
 function makeFileResult(filename, label, blob, note = '') {
@@ -701,11 +618,8 @@ function makeTextResult(filename, text, mime = 'text/plain;charset=utf-8') {
 }
 
 function setStatus(message, isError = false) {
-  const hasRenderedResults = resultBox?.querySelector('.result-list, .result-toolbar');
-  if (isError) {
-    resultBox.innerHTML = `<div class="status error">${escapeHtml(message)}</div>`;
-  } else if (!hasRenderedResults && (/converting|loading|choose a file|unsupported/i.test(message))) {
-    resultBox.innerHTML = `<div class="status">${escapeHtml(message)}</div>`;
+  if (isError || /converting|loading|choose a file|unsupported/i.test(message)) {
+    resultBox.innerHTML = `<div class="status ${isError ? 'error' : ''}">${escapeHtml(message)}</div>`;
   }
 
   if (!statusBadge) return;
@@ -894,8 +808,6 @@ function downloadAdsConfigFile() {
 }
 
 function resetAll() {
-  clearResultUrls();
-  hideProgress();
   fileInput.value = '';
   loadedFile = null;
   loadedType = null;
