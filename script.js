@@ -148,6 +148,7 @@ async function handleConvert() {
   cleanupResultUrls();
   currentResults = [];
   setProgress(2, 100, 'Preparing conversion...');
+  showResultInfo('Preparing conversion...');
   setStatus('Converting...');
 
   try {
@@ -792,8 +793,6 @@ function setProgress(current, total, message, indeterminate = false) {
     progressTrack.classList.toggle('indeterminate', indeterminate);
     progressTrack.setAttribute('aria-valuenow', String(percent));
   }
-
-  resultBox.innerHTML = `<div class="status">${escapeHtml(message)}</div>`;
 }
 
 function showProgress(message) {
