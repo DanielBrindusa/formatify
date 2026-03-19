@@ -161,4 +161,6 @@ Default password: formatify-admin
 
 ## License
 
-License: Proprietary – All rights reserved
+This project is proprietary software.
+
+All rights reserved. Unauthorized copying, modification, or distribution is strictly prohibited.
