@@ -29,6 +29,14 @@ const progressTrack = document.getElementById('progressTrack');
 const progressFill = document.getElementById('progressFill');
 const downloadAllBtn = document.getElementById('downloadAllBtn');
 
+const heroHeadline = document.getElementById('heroHeadline');
+const heroText = document.getElementById('heroText');
+const presetHint = document.getElementById('presetHint');
+const metaDescription = document.getElementById('metaDescription');
+const canonicalLink = document.getElementById('canonicalLink');
+const ogTitle = document.getElementById('ogTitle');
+const ogDescription = document.getElementById('ogDescription');
+
 const adStripTop = document.getElementById('adStripTop');
 const adStripBottom = document.getElementById('adStripBottom');
 const adSidebarInfo = document.getElementById('adSidebarInfo');
@@ -58,6 +66,53 @@ const MATRIX = {
   xlsx: ['pdf', 'csv', 'txt']
 };
 
+
+const CONVERSION_PRESETS = {
+  'png-to-jpg': {
+    from: 'png',
+    to: 'jpg',
+    title: 'PNG to JPG Converter — Formatify',
+    description: 'Convert PNG to JPG online in your browser with Formatify. Fast, privacy-friendly, client-side file conversion with no server uploads.',
+    headline: 'Convert PNG to JPG in a cleaner, friendlier workflow.',
+    text: 'Use Formatify to turn PNG files into JPG images directly in your browser. The interface stays the same, but this link is pre-focused on PNG to JPG conversions.',
+    hint: 'Preset active: PNG → JPG. Upload a PNG file and JPG will be preselected automatically.'
+  },
+  'pdf-to-word': {
+    from: 'pdf',
+    to: 'txt',
+    title: 'PDF to Word Converter — Formatify',
+    description: 'Convert PDF files online with Formatify. This preset focuses on PDF-based document export in a privacy-friendly browser workflow.',
+    headline: 'Convert PDF files with a focused, document-friendly workflow.',
+    text: 'This preset is optimized for people arriving for PDF document conversion. Upload a PDF and the app will preselect the closest supported document output automatically.',
+    hint: 'Preset active: PDF document conversion. Upload a PDF file and TXT will be preselected automatically.'
+  },
+  'webp-to-png': {
+    from: 'webp',
+    to: 'png',
+    title: 'WEBP to PNG Converter — Formatify',
+    description: 'Convert WEBP to PNG online with Formatify. This landing preset focuses on image conversion in a privacy-friendly browser workflow.',
+    headline: 'Convert WEBP to PNG in the same clean Formatify workflow.',
+    text: 'This preset is ready for image visitors arriving from WEBP to PNG searches. Formatify will guide them into the same converter interface while keeping the design unchanged.',
+    hint: 'Preset active: WEBP → PNG. Add WEBP support in the app before using this landing link publicly.'
+  },
+  'jpg-to-png': {
+    from: 'jpg',
+    to: 'png',
+    title: 'JPG to PNG Converter — Formatify',
+    description: 'Convert JPG to PNG online in your browser with Formatify. Fast, privacy-friendly conversion with previews and direct downloads.',
+    headline: 'Convert JPG to PNG in a cleaner, friendlier workflow.',
+    text: 'Use Formatify to turn JPG images into PNG files directly in your browser. This link keeps the same UX/UI and pre-focuses the page for JPG to PNG visitors.',
+    hint: 'Preset active: JPG → PNG. Upload a JPG or JPEG file and PNG will be preselected automatically.'
+  }
+};
+
+const DEFAULT_PAGE_CONTENT = {
+  title: 'Formatify — Universal File Converter',
+  description: 'Formatify is a browser-based file converter for PDF, DOCX, XLSX, PNG, JPG, JPEG, and ICO files. Convert files online in your browser with previews, fast downloads, and privacy-friendly client-side processing.',
+  headline: 'Convert files with a cleaner, friendlier workflow.',
+  text: 'A polished browser-based converter for images, PDFs, DOCX, XLSX, and ICO files. Fast, simple, and ready for GitHub Pages.'
+};
+
 let currentAdsConfig = null;
 let loadedFile = null;
 let loadedType = null;
@@ -66,6 +121,7 @@ let previewState = null;
 let activeTaskId = 0;
 let resultObjectUrls = [];
 let currentResults = [];
+let activePreset = null;
 
 fileInput.addEventListener('change', handleFileSelection);
 convertBtn.addEventListener('click', handleConvert);
@@ -78,8 +134,82 @@ loadAdsConfigBtn?.addEventListener('click', loadConfigIntoEditor);
 downloadAdsConfigBtn?.addEventListener('click', downloadAdsConfigFile);
 downloadAllBtn?.addEventListener('click', handleDownloadAll);
 
+activePreset = getActivePreset();
+applyPresetToPage(activePreset);
 await initAds();
 resetAll();
+
+
+function getActivePreset() {
+  const params = new URLSearchParams(window.location.search);
+  const presetKey = (params.get('type') || params.get('preset') || '').trim().toLowerCase();
+  if (CONVERSION_PRESETS[presetKey]) return CONVERSION_PRESETS[presetKey];
+
+  const from = (params.get('from') || '').trim().toLowerCase();
+  const to = (params.get('to') || '').trim().toLowerCase();
+  if (!from || !to) return null;
+
+  const normalizedFrom = from === 'jpeg' ? 'jpg' : from;
+  const normalizedTo = to === 'jpeg' ? 'jpg' : to;
+  const allowedOutputs = MATRIX[normalizedFrom];
+  if (!allowedOutputs || !allowedOutputs.includes(normalizedTo)) return null;
+
+  return {
+    from: normalizedFrom,
+    to: normalizedTo,
+    title: `${normalizedFrom.toUpperCase()} to ${normalizedTo.toUpperCase()} Converter — Formatify`,
+    description: `Convert ${normalizedFrom.toUpperCase()} to ${normalizedTo.toUpperCase()} online in your browser with Formatify. Fast, privacy-friendly file conversion with previews and direct downloads.`,
+    headline: `Convert ${normalizedFrom.toUpperCase()} to ${normalizedTo.toUpperCase()} with the same clean Formatify workflow.`,
+    text: `This link keeps the same UI while pre-focusing the page for ${normalizedFrom.toUpperCase()} to ${normalizedTo.toUpperCase()} visitors. Upload the matching file type and the target output will be preselected automatically.`,
+    hint: `Preset active: ${normalizedFrom.toUpperCase()} → ${normalizedTo.toUpperCase()}. Upload a matching file and ${normalizedTo.toUpperCase()} will be preselected automatically.`
+  };
+}
+
+function applyPresetToPage(preset) {
+  const content = preset || DEFAULT_PAGE_CONTENT;
+  document.title = content.title;
+  if (heroHeadline) heroHeadline.textContent = content.headline;
+  if (heroText) heroText.textContent = content.text;
+  if (metaDescription) metaDescription.setAttribute('content', content.description);
+  if (ogTitle) ogTitle.setAttribute('content', content.title);
+  if (ogDescription) ogDescription.setAttribute('content', content.description);
+
+  const currentUrl = new URL(window.location.href);
+  if (!preset) {
+    currentUrl.searchParams.delete('type');
+    currentUrl.searchParams.delete('preset');
+  }
+  if (canonicalLink) canonicalLink.setAttribute('href', currentUrl.toString());
+
+  if (presetHint) {
+    if (preset?.hint) {
+      presetHint.hidden = false;
+      presetHint.textContent = preset.hint;
+    } else {
+      presetHint.hidden = true;
+      presetHint.textContent = '';
+    }
+  }
+}
+
+function normalizePresetSource(type) {
+  if (type === 'jpeg') return 'jpg';
+  return type;
+}
+
+function applyPresetSelection(type) {
+  if (!activePreset || !outputFormat) return;
+  const normalizedType = normalizePresetSource(type);
+  const presetSource = normalizePresetSource(activePreset.from);
+  if (normalizedType !== presetSource) return;
+
+  const target = activePreset.to;
+  const options = Array.from(outputFormat.options || []);
+  const match = options.find((option) => option.value === target);
+  if (match) {
+    outputFormat.value = target;
+  }
+}
 
 async function handleFileSelection(event) {
   const file = event.target.files?.[0];
@@ -103,6 +233,7 @@ async function handleFileSelection(event) {
   }
 
   updateOutputOptions(loadedType);
+  applyPresetSelection(loadedType);
   syncVisibleControls(loadedType);
   setStatus('Loading preview...');
   showResultInfo(`Selected: ${file.name}`);
@@ -1073,6 +1204,7 @@ function resetAll() {
   convertBtn.disabled = false;
   inputType.value = 'No file selected';
   updateOutputOptions('png');
+  applyPresetSelection('png');
   syncVisibleControls('png');
   renderPreviewMessage('No file loaded');
   resultBox.innerHTML = '<p class="muted">Converted files will appear here.</p>';
